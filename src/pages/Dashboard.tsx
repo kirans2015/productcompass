@@ -4,7 +4,7 @@ import Navbar from "@/components/layout/Navbar";
 import { PMSearchBar } from "@/components/ui/pm-search-bar";
 import { PMCard, PMCardHeader, PMCardTitle, PMCardContent, PMCardFooter } from "@/components/ui/pm-card";
 import { PMButton } from "@/components/ui/pm-button";
-import { Calendar, Clock, Zap, ChevronRight } from "lucide-react";
+import { Calendar, Clock, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -84,7 +84,7 @@ const Dashboard = () => {
           </div>
 
           {/* Widgets Grid */}
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             {/* Upcoming Meetings */}
             <PMCard>
               <PMCardHeader>
@@ -139,32 +139,6 @@ const Dashboard = () => {
                   Clear history
                 </button>
               </PMCardFooter>
-            </PMCard>
-
-            {/* Quick Actions */}
-            <PMCard>
-              <PMCardHeader>
-                <Zap className="h-4 w-4 text-muted-foreground" />
-                <PMCardTitle>Quick Actions</PMCardTitle>
-              </PMCardHeader>
-              <PMCardContent>
-                <div className="space-y-3">
-                  <PMButton
-                    variant="primary"
-                    className="w-full"
-                    onClick={() => navigate("/meeting-prep/meeting-1")}
-                  >
-                    Prep for next meeting
-                  </PMButton>
-                  <PMButton
-                    variant="secondary"
-                    className="w-full"
-                    onClick={() => handleSearch("Find my most recent PRD")}
-                  >
-                    Find a PRD
-                  </PMButton>
-                </div>
-              </PMCardContent>
             </PMCard>
           </div>
         </motion.div>
