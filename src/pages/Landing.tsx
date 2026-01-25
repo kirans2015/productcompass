@@ -93,31 +93,6 @@ const Landing = () => {
           </button>
         </motion.div>
 
-        {/* Hero Image Placeholder */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mt-16 max-w-4xl mx-auto"
-        >
-          <div className="bg-gradient-to-br from-primary/5 to-purple/5 rounded-lg border border-border p-8 shadow-card">
-            <div className="bg-background rounded-md border border-border p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-3 w-3 rounded-full bg-error/80" />
-                <div className="h-3 w-3 rounded-full bg-warning/80" />
-                <div className="h-3 w-3 rounded-full bg-success/80" />
-              </div>
-              <div className="h-12 bg-secondary-bg rounded-md mb-4 flex items-center px-4">
-                <span className="text-muted-foreground text-sm">Ask me anything...</span>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="h-24 bg-secondary-bg rounded-md" />
-                <div className="h-24 bg-secondary-bg rounded-md" />
-                <div className="h-24 bg-secondary-bg rounded-md" />
-              </div>
-            </div>
-          </div>
-        </motion.div>
       </section>
 
       {/* Features Section */}
