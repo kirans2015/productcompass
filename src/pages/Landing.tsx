@@ -55,7 +55,7 @@ const Landing = () => {
             PM Compass is your AI-powered knowledge assistant that searches across your
             Google Workspace to surface exactly what you need, when you need it.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div className="flex flex-col items-center gap-3">
             <PMButton
               variant="hero"
               size="lg"
@@ -82,6 +82,12 @@ const Landing = () => {
               </svg>
               Get Started with Google
             </PMButton>
+            <button
+              onClick={() => navigate("/onboarding")}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Already have an account? Sign in
+            </button>
           </div>
           <button
             onClick={() =>
