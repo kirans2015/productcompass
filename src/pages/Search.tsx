@@ -1,0 +1,316 @@
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Navbar from "@/components/layout/Navbar";
+import { PMTabs, Tab } from "@/components/ui/pm-tabs";
+import { PMButton } from "@/components/ui/pm-button";
+import { PMBadge } from "@/components/ui/pm-badge";
+import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, Copy, Check, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+
+interface DocumentResult {
+  id: number;
+  type: "doc" | "slides" | "sheet";
+  title: string;
+  matchScore: number;
+  lastEdited: string;
+  owner: string;
+  snippet: string;
+}
+
+interface DecisionResult {
+  id: number;
+  confidence: "high" | "medium";
+  decisionText: string;
+  source: string;
+  date: string;
+  attendees: string[];
+}
+
+const mockDocumentResults: DocumentResult[] = [
+  {
+    id: 1,
+    type: "doc",
+    title: "Q3 Product Roadmap 2024",
+    matchScore: 95,
+    lastEdited: "Oct 15, 2024",
+    owner: "You",
+    snippet: "Key initiatives for Q3 include launching the new dashboard, improving search performance, and expanding to mobile platforms...",
+  },
+  {
+    id: 2,
+    type: "slides",
+    title: "Q3 Roadmap Presentation - Leadership Review",
+    matchScore: 88,
+    lastEdited: "Oct 18, 2024",
+    owner: "Sarah Chen",
+    snippet: "Quarterly roadmap overview presented to leadership team covering product strategy and resource allocation...",
+  },
+  {
+    id: 3,
+    type: "sheet",
+    title: "Roadmap Planning - Feature Prioritization",
+    matchScore: 76,
+    lastEdited: "Sep 28, 2024",
+    owner: "Mike Johnson",
+    snippet: "Feature scoring matrix with impact vs effort analysis for Q3 and Q4 planning cycles...",
+  },
+  {
+    id: 4,
+    type: "doc",
+    title: "Product Strategy Document",
+    matchScore: 71,
+    lastEdited: "Aug 15, 2024",
+    owner: "You",
+    snippet: "Long-term product vision and strategy document outlining roadmap themes for the next 12 months...",
+  },
+];
+
+const mockDecisionResults: DecisionResult[] = [
+  {
+    id: 1,
+    confidence: "high",
+    decisionText: "We decided to prioritize the dashboard redesign over mobile app development for Q3, with mobile pushed to Q4.",
+    source: "Q3 Planning Meeting Notes",
+    date: "Sep 15, 2024",
+    attendees: ["You", "Sarah Chen", "Product Team"],
+  },
+  {
+    id: 2,
+    confidence: "medium",
+    decisionText: "Agreed to limit Q3 scope to 3 major features maximum to ensure quality delivery.",
+    source: "Sprint Planning Document",
+    date: "Sep 20, 2024",
+    attendees: ["You", "Engineering Lead"],
+  },
+];
+
+const Search = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get("q") || "";
+  const [activeTab, setActiveTab] = useState("documents");
+  const [showSummary, setShowSummary] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  const tabs: Tab[] = [
+    { id: "documents", label: "Documents", count: mockDocumentResults.length },
+    { id: "decisions", label: "Decisions", count: mockDecisionResults.length },
+    { id: "all", label: "All", count: mockDocumentResults.length + mockDecisionResults.length },
+  ];
+
+  const getFileIcon = (type: string) => {
+    switch (type) {
+      case "doc":
+        return <FileText className="h-5 w-5 text-primary" />;
+      case "slides":
+        return <Presentation className="h-5 w-5 text-orange" />;
+      case "sheet":
+        return <Sheet className="h-5 w-5 text-success" />;
+      default:
+        return <FileText className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
+
+  const getScoreBadgeVariant = (score: number): "high" | "medium" | "low" => {
+    if (score >= 90) return "high";
+    if (score >= 70) return "medium";
+    return "low";
+  };
+
+  const handleSummarize = () => {
+    setLoadingSummary(true);
+    setTimeout(() => {
+      setLoadingSummary(false);
+      setShowSummary(true);
+    }, 2000);
+  };
+
+  const handleCopyDecision = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Decision copied to clipboard!");
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar isAuthenticated userName="Alex" />
+
+      <main className="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          {/* Back Button */}
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </button>
+
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-page-title text-foreground mb-1">
+                Results for: "{query}"
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Found {mockDocumentResults.length + mockDecisionResults.length} results
+              </p>
+            </div>
+            <PMButton
+              variant="secondary"
+              onClick={handleSummarize}
+              loading={loadingSummary}
+              className="gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Summarize All
+            </PMButton>
+          </div>
+
+          {/* AI Summary */}
+          <AnimatePresence>
+            {showSummary && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-6"
+              >
+                <div className="bg-primary/5 border border-primary/20 rounded-md p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-foreground">AI Summary</span>
+                    </div>
+                    <button
+                      onClick={() => setShowSummary(false)}
+                      className="p-1 hover:bg-primary/10 rounded transition-colors"
+                    >
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Based on {mockDocumentResults.length} documents about "{query}":
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    The Q3 roadmap focuses on three main initiatives: dashboard redesign, search improvements, and mobile platform expansion. Leadership approved the prioritization in mid-September, with a decision to limit scope to 3 major features. Sarah Chen is leading the dashboard work while mobile has been pushed to Q4.
+                  </p>
+                  <div className="mt-4 pt-3 border-t border-primary/10">
+                    <p className="text-xs text-muted-foreground">
+                      Sources: [1] Q3 Product Roadmap [2] Leadership Presentation [3] Planning Sheet [4] Strategy Doc
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Tabs */}
+          <PMTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} className="mb-6" />
+
+          {/* Results */}
+          <div className="space-y-0">
+            {/* Documents */}
+            {(activeTab === "documents" || activeTab === "all") &&
+              mockDocumentResults.map((doc, index) => (
+                <motion.div
+                  key={doc.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  className="border-b border-border py-4 hover:bg-secondary-bg/50 -mx-4 px-4 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex gap-3 flex-1">
+                      {getFileIcon(doc.type)}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-card-title text-foreground hover:text-primary cursor-pointer">
+                          {doc.title}
+                        </h3>
+                        <p className="text-small text-muted-foreground mt-1">
+                          Last edited: {doc.lastEdited} • Owner: {doc.owner}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                          {doc.snippet}
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                          <PMButton variant="ghost" size="sm" className="gap-1.5">
+                            <ExternalLink className="h-3 w-3" />
+                            Open in Drive
+                          </PMButton>
+                          <PMButton variant="ghost" size="sm">
+                            Summarize
+                          </PMButton>
+                          <PMButton variant="ghost" size="sm">
+                            View Details
+                          </PMButton>
+                        </div>
+                      </div>
+                    </div>
+                    <PMBadge variant={getScoreBadgeVariant(doc.matchScore)}>
+                      {doc.matchScore}% match
+                    </PMBadge>
+                  </div>
+                </motion.div>
+              ))}
+
+            {/* Decisions */}
+            {(activeTab === "decisions" || activeTab === "all") &&
+              mockDecisionResults.map((decision, index) => (
+                <motion.div
+                  key={decision.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  className="border-b border-border py-4 -mx-4 px-4"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-purple" />
+                      <span className="text-caption text-purple">DECISION</span>
+                    </div>
+                    <PMBadge variant={decision.confidence === "high" ? "purple" : "default"}>
+                      {decision.confidence === "high" ? "High Confidence" : "Medium Confidence"}
+                    </PMBadge>
+                  </div>
+                  <div className="pl-6 border-l-2 border-purple/30 mb-4">
+                    <p className="text-foreground leading-relaxed">
+                      "{decision.decisionText}"
+                    </p>
+                  </div>
+                  <div className="text-small text-muted-foreground mb-3">
+                    <p>
+                      Source: <span className="text-primary cursor-pointer hover:underline">{decision.source}</span>
+                    </p>
+                    <p>
+                      Date: {decision.date} • Attendees: {decision.attendees.join(", ")}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <PMButton variant="ghost" size="sm">
+                      View Full Document
+                    </PMButton>
+                    <PMButton
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => handleCopyDecision(decision.decisionText)}
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copy Decision
+                    </PMButton>
+                  </div>
+                </motion.div>
+              ))}
+          </div>
+        </motion.div>
+      </main>
+    </div>
+  );
+};
+
+export default Search;
