@@ -39,7 +39,7 @@ const Landing = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-24 md:pt-24 md:pb-32">
+      <section className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12 md:pt-24 md:pb-16">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
