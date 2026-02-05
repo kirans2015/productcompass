@@ -4,9 +4,10 @@ import Navbar from "@/components/layout/Navbar";
 import { PMTabs, Tab } from "@/components/ui/pm-tabs";
 import { PMButton } from "@/components/ui/pm-button";
 import { PMBadge } from "@/components/ui/pm-badge";
-import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, Copy, Check, X } from "lucide-react";
+import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, Copy, Check, X, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { callOpenAI } from "@/lib/openai-integration";
 
 interface DocumentResult {
   id: number;
@@ -92,6 +93,9 @@ const Search = () => {
   const [activeTab, setActiveTab] = useState("documents");
   const [showSummary, setShowSummary] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [summaryText, setSummaryText] = useState("");
+  const [summarizingDocId, setSummarizingDocId] = useState<number | null>(null);
+  const [docSummaries, setDocSummaries] = useState<Record<number, string>>({});
 
   const tabs: Tab[] = [
     { id: "documents", label: "Documents", count: mockDocumentResults.length },
@@ -118,12 +122,40 @@ const Search = () => {
     return "low";
   };
 
-  const handleSummarize = () => {
+  const handleSummarize = async () => {
     setLoadingSummary(true);
-    setTimeout(() => {
-      setLoadingSummary(false);
+    try {
+      const docsContext = mockDocumentResults
+        .map((doc) => `Document: "${doc.title}" - ${doc.snippet}`)
+        .join("\n\n");
+      
+      const result = await callOpenAI(
+        `Summarize these search results for the query "${query}". Provide a concise 2-3 sentence summary of the key information across all documents. End with a brief list of sources.`,
+        docsContext
+      );
+      setSummaryText(result);
       setShowSummary(true);
-    }, 2000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to generate summary");
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const handleSummarizeDoc = async (doc: DocumentResult) => {
+    setSummarizingDocId(doc.id);
+    try {
+      const result = await callOpenAI(
+        `Summarize this document in 2-3 sentences. Focus on the key points and actionable information.`,
+        `Title: ${doc.title}\nContent: ${doc.snippet}`
+      );
+      setDocSummaries((prev) => ({ ...prev, [doc.id]: result }));
+      toast.success("Document summarized!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to summarize");
+    } finally {
+      setSummarizingDocId(null);
+    }
   };
 
   const handleCopyDecision = (text: string) => {
@@ -196,14 +228,9 @@ const Search = () => {
                   <p className="text-sm text-muted-foreground mb-3">
                     Based on {mockDocumentResults.length} documents about "{query}":
                   </p>
-                  <p className="text-sm text-foreground leading-relaxed">
-                    The Q3 roadmap focuses on three main initiatives: dashboard redesign, search improvements, and mobile platform expansion. Leadership approved the prioritization in mid-September, with a decision to limit scope to 3 major features. Sarah Chen is leading the dashboard work while mobile has been pushed to Q4.
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                    {summaryText}
                   </p>
-                  <div className="mt-4 pt-3 border-t border-primary/10">
-                    <p className="text-xs text-muted-foreground">
-                      Sources: [1] Q3 Product Roadmap [2] Leadership Presentation [3] Planning Sheet [4] Strategy Doc
-                    </p>
-                  </div>
                 </div>
               </motion.div>
             )}
@@ -237,13 +264,33 @@ const Search = () => {
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                           {doc.snippet}
                         </p>
+                        {docSummaries[doc.id] && (
+                          <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded text-sm text-foreground">
+                            <div className="flex items-center gap-1.5 mb-1 text-xs text-primary font-medium">
+                              <Sparkles className="h-3 w-3" />
+                              AI Summary
+                            </div>
+                            {docSummaries[doc.id]}
+                          </div>
+                        )}
                         <div className="flex gap-2 mt-3">
                           <PMButton variant="ghost" size="sm" className="gap-1.5">
                             <ExternalLink className="h-3 w-3" />
                             Open in Drive
                           </PMButton>
-                          <PMButton variant="ghost" size="sm">
-                            Summarize
+                          <PMButton 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleSummarizeDoc(doc)}
+                            disabled={summarizingDocId === doc.id}
+                            className="gap-1.5"
+                          >
+                            {summarizingDocId === doc.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3 w-3" />
+                            )}
+                            {summarizingDocId === doc.id ? "Summarizing..." : "Summarize"}
                           </PMButton>
                           <PMButton variant="ghost" size="sm">
                             View Details

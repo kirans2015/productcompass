@@ -1,28 +1,12 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { PMButton } from "@/components/ui/pm-button";
-import { FileText, Calendar, Lightbulb, Lock, Shield, CheckCircle, Sparkles, Loader2 } from "lucide-react";
+import { FileText, Calendar, Lightbulb, Lock, Shield, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { callOpenAI } from "@/lib/openai-integration";
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [aiResponse, setAiResponse] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
 
-  const testAI = async () => {
-    setIsLoading(true);
-    setAiResponse("");
-    try {
-      const result = await callOpenAI("Tell me a fun fact about product management in one sentence.");
-      setAiResponse(result);
-    } catch (error) {
-      setAiResponse(`Error: ${error instanceof Error ? error.message : "Something went wrong"}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
   const features = [
     {
       icon: FileText,
@@ -113,30 +97,6 @@ const Landing = () => {
           >
             See how it works ↓
           </button>
-
-          {/* AI Test Section */}
-          <div className="mt-8 p-4 border border-border rounded-lg bg-card max-w-md mx-auto">
-            <p className="text-sm text-muted-foreground mb-3">🧪 Test AI Integration</p>
-            <PMButton
-              variant="secondary"
-              size="sm"
-              onClick={testAI}
-              disabled={isLoading}
-              className="gap-2"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              {isLoading ? "Thinking..." : "Ask AI a Question"}
-            </PMButton>
-            {aiResponse && (
-              <p className="mt-3 text-sm text-foreground bg-secondary-bg p-3 rounded">
-                {aiResponse}
-              </p>
-            )}
-          </div>
         </motion.div>
 
       </section>
