@@ -94,17 +94,29 @@ const Dashboard = () => {
               <PMCardContent>
                 <div className="space-y-1">
                   {upcomingMeetings.map((meeting) => (
-                    <button
+                    <div
                       key={meeting.id}
-                      onClick={() => navigate(`/meeting-prep/${meeting.id}`)}
                       className="w-full flex items-center justify-between p-2 -mx-2 rounded-md hover:bg-secondary-bg transition-colors group"
                     >
-                      <span className="text-sm text-foreground">{meeting.title}</span>
-                      <span className="text-small text-muted-foreground group-hover:text-foreground flex items-center gap-1">
-                        {meeting.time}
-                        <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </span>
-                    </button>
+                      <button
+                        onClick={() => navigate(`/meeting-prep/${meeting.id}`)}
+                        className="flex items-center gap-2 text-sm text-foreground hover:underline"
+                      >
+                        {meeting.title}
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-small text-muted-foreground">
+                          {meeting.time}
+                        </span>
+                        <PMButton
+                          size="sm"
+                          onClick={() => navigate(`/meeting-prep/${meeting.id}`)}
+                          className="h-7 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                          Prep
+                        </PMButton>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </PMCardContent>
