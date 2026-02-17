@@ -56,7 +56,7 @@ const Dashboard = () => {
     { id: "meeting-3", title: "Sprint Planning", time: "4:00 PM" },
   ];
 
-  const recentSearches = ["Q3 roadmap", "pricing decision", "competitor analysis"];
+  const recentSearches = ["Q3 roadmap", "product requirements", "competitor analysis"];
 
   return (
     <div className="min-h-screen bg-background">

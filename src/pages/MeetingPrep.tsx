@@ -3,7 +3,7 @@ import Navbar from "@/components/layout/Navbar";
 import { PMCard, PMCardHeader, PMCardTitle, PMCardContent } from "@/components/ui/pm-card";
 import { PMButton } from "@/components/ui/pm-button";
 import { PMAvatar } from "@/components/ui/pm-avatar";
-import { ArrowLeft, Calendar, Users, Target, FileText, MessageSquare, Copy, RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowLeft, Calendar, Users, Target, FileText, Copy, RefreshCw, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -57,18 +57,6 @@ const mockMeetingPrep = {
     { name: "Engineering Capacity Plan", context: "Shared by Sarah, Dec 1" },
     { name: "Feature Priority Matrix", context: "You created Nov 28" },
   ],
-  pastDecisions: [
-    {
-      text: "Agreed to limit Q1 to 3 major features max",
-      source: "Q4 Retrospective",
-      date: "Nov 15, 2024",
-    },
-    {
-      text: "Sarah confirmed 2 engineers available for API work",
-      source: "1:1 with Sarah",
-      date: "Nov 22, 2024",
-    },
-  ],
 };
 
 const MeetingPrep = () => {
@@ -87,9 +75,6 @@ ${mockMeetingPrep.likelyTopics.map((t) => `• ${t}`).join("\n")}
 
 Relevant Documents:
 ${mockMeetingPrep.relevantDocs.map((d) => `• ${d.name} - ${d.context}`).join("\n")}
-
-Past Decisions:
-${mockMeetingPrep.pastDecisions.map((d) => `• "${d.text}" — ${d.source}, ${d.date}`).join("\n")}
     `.trim();
 
     navigator.clipboard.writeText(brief);
@@ -207,35 +192,6 @@ ${mockMeetingPrep.pastDecisions.map((d) => `• "${d.text}" — ${d.source}, ${d
             <PMButton variant="secondary" className="mt-3 w-full sm:w-auto">
               Open All in New Tabs
             </PMButton>
-          </section>
-
-          <hr className="border-border mb-8" />
-
-          {/* Past Decisions */}
-          <section className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <span className="text-caption text-muted-foreground">PAST DECISIONS</span>
-            </div>
-            <PMCard className="p-0">
-              <PMCardContent className="divide-y divide-border">
-                {mockMeetingPrep.pastDecisions.map((decision) => (
-                  <div key={decision.text} className="p-4">
-                    <div className="border-l-2 border-purple/40 pl-4 mb-2">
-                      <p className="text-sm text-foreground">"{decision.text}"</p>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-small text-muted-foreground">
-                        — {decision.source}, {decision.date}
-                      </p>
-                      <PMButton variant="ghost" size="sm">
-                        View Doc
-                      </PMButton>
-                    </div>
-                  </div>
-                ))}
-              </PMCardContent>
-            </PMCard>
           </section>
 
           <hr className="border-border mb-8" />

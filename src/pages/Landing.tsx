@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { PMButton } from "@/components/ui/pm-button";
-import { FileText, Calendar, Lightbulb, Lock, Shield, CheckCircle } from "lucide-react";
+import { FileText, Calendar, Lock, Shield, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Landing = () => {
@@ -18,13 +18,7 @@ const Landing = () => {
       icon: Calendar,
       title: "Prepare for Meetings",
       description:
-        "Get automatically curated context before any meeting — relevant docs, past discussions, and key decisions all in one place.",
-    },
-    {
-      icon: Lightbulb,
-      title: "Recall Past Decisions",
-      description:
-        "Never re-debate settled decisions. Instantly find what was decided, when, and by whom.",
+        "Get automatically curated context before any meeting — relevant docs, past discussions, and key topics all in one place.",
     },
   ];
 
@@ -48,8 +42,7 @@ const Landing = () => {
         >
           <h1 className="text-hero text-foreground mb-6">
             Find any document.{" "}
-            <span className="block">Prepare for any meeting.</span>{" "}
-            <span className="block">Recall any decision.</span>
+            <span className="block">Prepare for any meeting.</span>
           </h1>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             PM Compass is your AI-powered knowledge assistant that searches across your
@@ -104,7 +97,7 @@ const Landing = () => {
       {/* Features Section */}
       <section id="features" className="bg-secondary-bg py-20">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {features.map((feature, index) => (
               <motion.div
                 key={feature.title}
