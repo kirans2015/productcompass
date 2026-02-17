@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
-import { PMTabs, Tab } from "@/components/ui/pm-tabs";
 import { PMButton } from "@/components/ui/pm-button";
 import { PMBadge } from "@/components/ui/pm-badge";
-import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, Copy, Check, X, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, X, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { callOpenAI } from "@/lib/openai-integration";
@@ -17,15 +16,6 @@ interface DocumentResult {
   lastEdited: string;
   owner: string;
   snippet: string;
-}
-
-interface DecisionResult {
-  id: number;
-  confidence: "high" | "medium";
-  decisionText: string;
-  source: string;
-  date: string;
-  attendees: string[];
 }
 
 const mockDocumentResults: DocumentResult[] = [
@@ -67,41 +57,15 @@ const mockDocumentResults: DocumentResult[] = [
   },
 ];
 
-const mockDecisionResults: DecisionResult[] = [
-  {
-    id: 1,
-    confidence: "high",
-    decisionText: "We decided to prioritize the dashboard redesign over mobile app development for Q3, with mobile pushed to Q4.",
-    source: "Q3 Planning Meeting Notes",
-    date: "Sep 15, 2024",
-    attendees: ["You", "Sarah Chen", "Product Team"],
-  },
-  {
-    id: 2,
-    confidence: "medium",
-    decisionText: "Agreed to limit Q3 scope to 3 major features maximum to ensure quality delivery.",
-    source: "Sprint Planning Document",
-    date: "Sep 20, 2024",
-    attendees: ["You", "Engineering Lead"],
-  },
-];
-
 const Search = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
-  const [activeTab, setActiveTab] = useState("documents");
   const [showSummary, setShowSummary] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryText, setSummaryText] = useState("");
   const [summarizingDocId, setSummarizingDocId] = useState<number | null>(null);
   const [docSummaries, setDocSummaries] = useState<Record<number, string>>({});
-
-  const tabs: Tab[] = [
-    { id: "documents", label: "Documents", count: mockDocumentResults.length },
-    { id: "decisions", label: "Decisions", count: mockDecisionResults.length },
-    { id: "all", label: "All", count: mockDocumentResults.length + mockDecisionResults.length },
-  ];
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -158,11 +122,6 @@ const Search = () => {
     }
   };
 
-  const handleCopyDecision = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Decision copied to clipboard!");
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar isAuthenticated userName="Alex" />
@@ -189,7 +148,7 @@ const Search = () => {
                 Results for: "{query}"
               </h1>
               <p className="text-sm text-muted-foreground">
-                Found {mockDocumentResults.length + mockDecisionResults.length} results
+                Found {mockDocumentResults.length} documents
               </p>
             </div>
             <PMButton
@@ -236,123 +195,69 @@ const Search = () => {
             )}
           </AnimatePresence>
 
-          {/* Tabs */}
-          <PMTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} className="mb-6" />
-
-          {/* Results */}
+          {/* Document Results */}
           <div className="space-y-0">
-            {/* Documents */}
-            {(activeTab === "documents" || activeTab === "all") &&
-              mockDocumentResults.map((doc, index) => (
-                <motion.div
-                  key={doc.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  className="border-b border-border py-4 hover:bg-secondary-bg/50 -mx-4 px-4 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex gap-3 flex-1">
-                      {getFileIcon(doc.type)}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-card-title text-foreground hover:text-primary cursor-pointer">
-                          {doc.title}
-                        </h3>
-                        <p className="text-small text-muted-foreground mt-1">
-                          Last edited: {doc.lastEdited} • Owner: {doc.owner}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                          {doc.snippet}
-                        </p>
-                        {docSummaries[doc.id] && (
-                          <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded text-sm text-foreground">
-                            <div className="flex items-center gap-1.5 mb-1 text-xs text-primary font-medium">
-                              <Sparkles className="h-3 w-3" />
-                              AI Summary
-                            </div>
-                            {docSummaries[doc.id]}
+            {mockDocumentResults.map((doc, index) => (
+              <motion.div
+                key={doc.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                className="border-b border-border py-4 hover:bg-secondary-bg/50 -mx-4 px-4 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex gap-3 flex-1">
+                    {getFileIcon(doc.type)}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-card-title text-foreground hover:text-primary cursor-pointer">
+                        {doc.title}
+                      </h3>
+                      <p className="text-small text-muted-foreground mt-1">
+                        Last edited: {doc.lastEdited} • Owner: {doc.owner}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                        {doc.snippet}
+                      </p>
+                      {docSummaries[doc.id] && (
+                        <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded text-sm text-foreground">
+                          <div className="flex items-center gap-1.5 mb-1 text-xs text-primary font-medium">
+                            <Sparkles className="h-3 w-3" />
+                            AI Summary
                           </div>
-                        )}
-                        <div className="flex gap-2 mt-3">
-                          <PMButton variant="ghost" size="sm" className="gap-1.5">
-                            <ExternalLink className="h-3 w-3" />
-                            Open in Drive
-                          </PMButton>
-                          <PMButton 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleSummarizeDoc(doc)}
-                            disabled={summarizingDocId === doc.id}
-                            className="gap-1.5"
-                          >
-                            {summarizingDocId === doc.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-3 w-3" />
-                            )}
-                            {summarizingDocId === doc.id ? "Summarizing..." : "Summarize"}
-                          </PMButton>
-                          <PMButton variant="ghost" size="sm">
-                            View Details
-                          </PMButton>
+                          {docSummaries[doc.id]}
                         </div>
+                      )}
+                      <div className="flex gap-2 mt-3">
+                        <PMButton variant="ghost" size="sm" className="gap-1.5">
+                          <ExternalLink className="h-3 w-3" />
+                          Open in Drive
+                        </PMButton>
+                        <PMButton 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleSummarizeDoc(doc)}
+                          disabled={summarizingDocId === doc.id}
+                          className="gap-1.5"
+                        >
+                          {summarizingDocId === doc.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3 w-3" />
+                          )}
+                          {summarizingDocId === doc.id ? "Summarizing..." : "Summarize"}
+                        </PMButton>
+                        <PMButton variant="ghost" size="sm">
+                          View Details
+                        </PMButton>
                       </div>
                     </div>
-                    <PMBadge variant={getScoreBadgeVariant(doc.matchScore)}>
-                      {doc.matchScore}% match
-                    </PMBadge>
                   </div>
-                </motion.div>
-              ))}
-
-            {/* Decisions */}
-            {(activeTab === "decisions" || activeTab === "all") &&
-              mockDecisionResults.map((decision, index) => (
-                <motion.div
-                  key={decision.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  className="border-b border-border py-4 -mx-4 px-4"
-                >
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-purple" />
-                      <span className="text-caption text-purple">DECISION</span>
-                    </div>
-                    <PMBadge variant={decision.confidence === "high" ? "purple" : "default"}>
-                      {decision.confidence === "high" ? "High Confidence" : "Medium Confidence"}
-                    </PMBadge>
-                  </div>
-                  <div className="pl-6 border-l-2 border-purple/30 mb-4">
-                    <p className="text-foreground leading-relaxed">
-                      "{decision.decisionText}"
-                    </p>
-                  </div>
-                  <div className="text-small text-muted-foreground mb-3">
-                    <p>
-                      Source: <span className="text-primary cursor-pointer hover:underline">{decision.source}</span>
-                    </p>
-                    <p>
-                      Date: {decision.date} • Attendees: {decision.attendees.join(", ")}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <PMButton variant="ghost" size="sm">
-                      View Full Document
-                    </PMButton>
-                    <PMButton
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => handleCopyDecision(decision.decisionText)}
-                    >
-                      <Copy className="h-3 w-3" />
-                      Copy Decision
-                    </PMButton>
-                  </div>
-                </motion.div>
-              ))}
+                  <PMBadge variant={getScoreBadgeVariant(doc.matchScore)}>
+                    {doc.matchScore}% match
+                  </PMBadge>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </motion.div>
       </main>

@@ -60,7 +60,7 @@ const Onboarding = () => {
   const examplePrompts = [
     "Find my most recent PRD",
     "What meetings do I have this week?",
-    "What did we decide about pricing?",
+    "Show me the Q3 roadmap",
   ];
 
   const handleSearch = (query: string) => {
