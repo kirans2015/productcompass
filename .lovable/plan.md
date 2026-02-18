@@ -1,19 +1,31 @@
 
 
-## Remove X Close Button from Feedback Modal
+## Add "Usage This Month" Section to Settings
 
-Remove the built-in X (close) button from the `PMModal` component when used in the `FeedbackModal`, keeping only the Cancel button.
-
-### Approach
-
-Since the X button is rendered inside `PMModal` itself (`src/components/ui/pm-modal.tsx`), and other parts of the app may use `PMModal` with the X button, the cleanest approach is to add an optional `showCloseButton` prop (defaulting to `true`) to `PMModal`, and pass `showCloseButton={false}` from `FeedbackModal`.
+Add a new section after "Indexing Status" displaying usage counts and a beta badge.
 
 ### Changes
 
-**1. `src/components/ui/pm-modal.tsx`**
-- Add optional `showCloseButton?: boolean` prop (default: `true`)
-- Conditionally render the X button based on this prop
+**`src/pages/Settings.tsx`**
+- Insert a new "USAGE THIS MONTH" section after the Indexing Status `<hr>` and before the Account section
+- Display "32 searches" and "8 meeting preps" as simple text rows with labels
+- Add a `PMBadge` with variant "success" (green pill) showing "Beta — Unlimited access"
+- Import `PMBadge` from `@/components/ui/pm-badge`
 
-**2. `src/components/search/FeedbackModal.tsx`**
-- Pass `showCloseButton={false}` to `PMModal`
+### Structure
+
+```text
+USAGE THIS MONTH
++--------------------------------------+
+| Searches              32             |
+| Meeting preps          8             |
+|                                      |
+| [Beta — Unlimited access]  (badge)   |
++--------------------------------------+
+```
+
+### Technical Details
+- Uses the existing `PMBadge` component with `variant="success"` for the green pill style
+- Follows the same card pattern as other Settings sections (`p-4 bg-card border border-border rounded-md`)
+- Usage stats displayed as flex rows with label on the left and count on the right, matching the Account section's layout
 
