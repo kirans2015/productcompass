@@ -1,84 +1,31 @@
 
-# Fix Auth Redirect Flow
+
+# Fix Google Sign-In on Published URL
 
 ## Problem
-After Google sign-in, users are redirected back to the landing page instead of the dashboard. There are also no route guards to protect authenticated/unauthenticated routes.
+Google sign-in works on the preview URL but fails on the published URL (`https://productcompass.lovable.app`). After the Google OAuth flow completes, users are not being properly redirected or authenticated.
 
 ## Root Cause
-The `AuthCallback` page calls `supabase.auth.getSession()` immediately, but the OAuth session may not be fully established yet from the hash fragment. Additionally, no components enforce route protection.
+The `redirect_uri` is set to `window.location.origin + "/auth/callback"`, but the Lovable Cloud auth bridge handles the OAuth callback internally at a special route (`/~oauth`). The `redirect_uri` should point to the page where the user should land **after** authentication is complete -- not a dedicated callback page. Since `PublicRoute` on `/` already redirects authenticated users to `/dashboard`, the simplest fix is to redirect back to `window.location.origin`.
 
-## Plan
+## Changes
 
-### 1. Create a `ProtectedRoute` component
-A wrapper that checks auth state and redirects unauthenticated users to `/`.
+### 1. Update `redirect_uri` in Landing.tsx (line 27)
+Change `redirect_uri` from `window.location.origin + "/auth/callback"` to `window.location.origin`.
 
-**New file: `src/components/ProtectedRoute.tsx`**
-- Uses `useAuth()` to check `user` and `loading`
-- While loading, shows a spinner
-- If no user, redirects to `/`
-- Otherwise, renders children
+### 2. Update `redirect_uri` in Onboarding.tsx (line 76)
+Same change -- use `window.location.origin` instead of `window.location.origin + "/auth/callback"`.
 
-### 2. Create a `PublicRoute` component (for Landing page)
-A wrapper that redirects authenticated users to `/dashboard`.
-
-**New file: `src/components/PublicRoute.tsx`**
-- Uses `useAuth()` to check `user` and `loading`
-- While loading, shows a spinner
-- If user exists, redirects to `/dashboard`
-- Otherwise, renders children
-
-### 3. Fix `AuthCallback.tsx`
-The current implementation may check `getSession()` before the OAuth hash is processed. Fix it to:
-- Listen for the `onAuthStateChange` event instead of polling `getSession()`
-- Navigate to `/dashboard` on `SIGNED_IN` event
-- Add a timeout fallback to redirect to `/` if no session after a few seconds
-
-### 4. Update `App.tsx` routes
-- Wrap `/` (Landing) with `PublicRoute`
-- Wrap `/dashboard`, `/search`, `/meeting-prep/:meetingId`, `/settings` with `ProtectedRoute`
-- Leave `/onboarding`, `/auth/callback`, and `*` unwrapped
-
-### 5. Update Landing page
-- Add `useAuth` import and redirect logic is handled by `PublicRoute`, so no changes needed in `Landing.tsx` itself.
-
----
-
-### Technical Details
-
-**ProtectedRoute.tsx:**
-```tsx
-const { user, loading } = useAuth();
-if (loading) return <Loader />;
-if (!user) return <Navigate to="/" replace />;
-return children;
-```
-
-**PublicRoute.tsx:**
-```tsx
-const { user, loading } = useAuth();
-if (loading) return <Loader />;
-if (user) return <Navigate to="/dashboard" replace />;
-return children;
-```
-
-**AuthCallback.tsx fix:**
-```tsx
-useEffect(() => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_IN" && session) {
-      navigate("/dashboard", { replace: true });
-    }
-  });
-  // Fallback timeout
-  const timeout = setTimeout(() => navigate("/", { replace: true }), 5000);
-  return () => { subscription.unsubscribe(); clearTimeout(timeout); };
-}, [navigate]);
-```
+### How It Works After the Fix
+1. User clicks "Get Started with Google"
+2. Lovable auth bridge handles the Google OAuth flow
+3. After success, the browser returns to `window.location.origin` (the landing page)
+4. `AuthContext` detects the new session via `onAuthStateChange`
+5. `PublicRoute` sees the authenticated user and redirects to `/dashboard`
 
 ### Files Changed
-| File | Action |
+| File | Change |
 |------|--------|
-| `src/components/ProtectedRoute.tsx` | Create |
-| `src/components/PublicRoute.tsx` | Create |
-| `src/pages/AuthCallback.tsx` | Modify |
-| `src/App.tsx` | Modify |
+| `src/pages/Landing.tsx` | Update `redirect_uri` to `window.location.origin` |
+| `src/pages/Onboarding.tsx` | Update `redirect_uri` to `window.location.origin` |
+
