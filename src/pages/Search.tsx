@@ -8,7 +8,7 @@ import { PMBadge } from "@/components/ui/pm-badge";
 import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, X, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { callOpenAI } from "@/lib/openai-integration";
+
 
 interface DocumentResult {
   id: number;
@@ -115,39 +115,11 @@ const Search = () => {
   };
 
   const handleSummarize = async () => {
-    setLoadingSummary(true);
-    try {
-      const docsContext = mockDocumentResults
-        .map((doc) => `Document: "${doc.title}" - ${doc.snippet}`)
-        .join("\n\n");
-      
-      const result = await callOpenAI(
-        `Summarize these search results for the query "${query}". Provide a concise 2-3 sentence summary of the key information across all documents. End with a brief list of sources.`,
-        docsContext
-      );
-      setSummaryText(result);
-      setShowSummary(true);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to generate summary");
-    } finally {
-      setLoadingSummary(false);
-    }
+    toast.info("AI summarization is not currently available.");
   };
 
   const handleSummarizeDoc = async (doc: DocumentResult) => {
-    setSummarizingDocId(doc.id);
-    try {
-      const result = await callOpenAI(
-        `Summarize this document in 2-3 sentences. Focus on the key points and actionable information.`,
-        `Title: ${doc.title}\nContent: ${doc.snippet}`
-      );
-      setDocSummaries((prev) => ({ ...prev, [doc.id]: result }));
-      toast.success("Document summarized!");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to summarize");
-    } finally {
-      setSummarizingDocId(null);
-    }
+    toast.info("AI summarization is not currently available.");
   };
 
   return (
