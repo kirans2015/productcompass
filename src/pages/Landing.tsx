@@ -24,7 +24,7 @@ const Landing = () => {
 
   const trustItems = [
     { icon: Lock, text: "Read-only access" },
-    { icon: Shield, text: "SOC 2 compliant" },
+    { icon: Shield, text: "Built on SOC 2 certified infrastructure" },
     { icon: CheckCircle, text: "Data stays in Google" },
   ];
 
