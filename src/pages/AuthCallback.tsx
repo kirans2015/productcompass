@@ -7,24 +7,19 @@ const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleCallback = async () => {
-      // Supabase will automatically handle the hash fragment from the OAuth redirect
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error("Auth callback error:", error);
-        navigate("/onboarding");
-        return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        navigate("/dashboard", { replace: true });
       }
+    });
 
-      if (session) {
-        navigate("/dashboard");
-      } else {
-        navigate("/onboarding");
-      }
+    // Fallback: if no sign-in event after 5s, redirect to landing
+    const timeout = setTimeout(() => navigate("/", { replace: true }), 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
     };
-
-    handleCallback();
   }, [navigate]);
 
   return (
