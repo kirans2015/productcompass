@@ -30,7 +30,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Token storage is handled in AuthCallback.tsx immediately after OAuth sign-in
+        // Store provider tokens when user signs in via OAuth
+        // provider_token is available in the session passed to onAuthStateChange
+        if (event === "SIGNED_IN" && session?.provider_token) {
+          const tokenBody = {
+            access_token: session.provider_token,
+            refresh_token: session.provider_refresh_token || null,
+            expires_at: session.expires_at
+              ? new Date(session.expires_at * 1000).toISOString()
+              : null,
+          };
+          supabase.functions.invoke("store-oauth-tokens", {
+            body: tokenBody,
+          }).then(({ error }) => {
+            if (error) {
+              console.error("Failed to store OAuth tokens:", error);
+            } else {
+              console.log("OAuth tokens stored successfully");
+            }
+          }).catch((err) => {
+            console.error("Failed to store OAuth tokens:", err);
+          });
+        }
       }
     );
 
