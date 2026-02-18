@@ -22,6 +22,19 @@ const Navbar = ({ isAuthenticated = false, userName = "Alex" }: NavbarProps) => 
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const [scrolled, setScrolled] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = () => {
+    setSigningOut(true);
+    signOut()
+      .then(() => {
+        window.location.href = "/";
+      })
+      .catch((err) => {
+        console.error("Sign out error:", err);
+        setSigningOut(false);
+      });
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -91,11 +104,11 @@ const Navbar = ({ isAuthenticated = false, userName = "Alex" }: NavbarProps) => 
                       className="gap-2 text-error"
                       onSelect={(e) => {
                         e.preventDefault();
-                        signOut().then(() => navigate("/"));
+                        handleSignOut();
                       }}
                     >
                       <LogOut className="h-4 w-4" />
-                      <span>Sign Out</span>
+                      <span>{signingOut ? "Signing out..." : "Sign Out"}</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
