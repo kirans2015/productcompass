@@ -2,3 +2,6 @@ project_id = "nqdausnuvczxvocslzrj"
 
 [functions.store-oauth-tokens]
 verify_jwt = false
+
+[functions.index-documents]
+verify_jwt = false
