@@ -60,7 +60,6 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
           <div className="flex items-center gap-3">
             {getFileIcon(doc.type)}
             <SheetTitle className="text-lg">{doc.title}</SheetTitle>
-            <PMBadge variant="default" className="shrink-0">{getFileTypeLabel(doc.type)}</PMBadge>
           </div>
           <SheetDescription className="sr-only">Document details</SheetDescription>
         </SheetHeader>
