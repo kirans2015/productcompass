@@ -89,9 +89,9 @@ const Navbar = ({ isAuthenticated = false, userName = "Alex" }: NavbarProps) => 
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="gap-2 text-error"
-                      onClick={async () => {
-                        await signOut();
-                        navigate("/");
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        signOut().then(() => navigate("/"));
                       }}
                     >
                       <LogOut className="h-4 w-4" />
