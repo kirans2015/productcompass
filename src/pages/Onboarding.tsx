@@ -73,7 +73,7 @@ const Onboarding = () => {
     setSigningIn(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin + "/auth/callback",
+        redirect_uri: window.location.origin,
         extraParams: {
           access_type: "offline",
           prompt: "consent",
