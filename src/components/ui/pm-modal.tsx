@@ -8,9 +8,10 @@ interface PMModalProps {
   onClose: () => void;
   children: React.ReactNode;
   className?: string;
+  showCloseButton?: boolean;
 }
 
-const PMModal = ({ open, onClose, children, className }: PMModalProps) => {
+const PMModal = ({ open, onClose, children, className, showCloseButton = true }: PMModalProps) => {
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -47,12 +48,14 @@ const PMModal = ({ open, onClose, children, className }: PMModalProps) => {
               className
             )}
           >
-            <button
-              onClick={onClose}
-              className="absolute right-4 top-4 p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            {showCloseButton && (
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-4 p-1 rounded-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
             {children}
           </motion.div>
         </div>
