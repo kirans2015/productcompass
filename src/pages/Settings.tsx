@@ -148,15 +148,6 @@ const Settings = () => {
                 <span className="text-sm text-muted-foreground">Email</span>
                 <span className="text-sm text-foreground">alex@company.com</span>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm text-muted-foreground">Last sync</span>
-                  <span className="text-sm text-foreground ml-2">Today, 9:42 AM</span>
-                </div>
-                <PMButton variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
-                  Sync Now
-                </PMButton>
-              </div>
             </div>
           </section>
 
