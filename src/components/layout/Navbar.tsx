@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PMButton } from "@/components/ui/pm-button";
 import { Compass, Settings, LogOut, User } from "lucide-react";
 import { PMAvatar } from "@/components/ui/pm-avatar";
+import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ interface NavbarProps {
 const Navbar = ({ isAuthenticated = false, userName = "Alex" }: NavbarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -87,7 +89,10 @@ const Navbar = ({ isAuthenticated = false, userName = "Alex" }: NavbarProps) => 
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="gap-2 text-error"
-                      onClick={() => navigate("/")}
+                      onClick={async () => {
+                        await signOut();
+                        navigate("/");
+                      }}
                     >
                       <LogOut className="h-4 w-4" />
                       <span>Sign Out</span>
