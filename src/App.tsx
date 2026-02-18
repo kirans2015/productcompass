@@ -12,6 +12,8 @@ import MeetingPrep from "./pages/MeetingPrep";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./pages/AuthCallback";
+import ProtectedRoute from "./components/ProtectedRoute";
+import PublicRoute from "./components/PublicRoute";
 
 const queryClient = new QueryClient();
 
@@ -23,13 +25,13 @@ const App = () => (
         <Sonner position="bottom-right" />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/meeting-prep/:meetingId" element={<MeetingPrep />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+            <Route path="/meeting-prep/:meetingId" element={<ProtectedRoute><MeetingPrep /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
