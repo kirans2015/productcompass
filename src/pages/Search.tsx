@@ -148,7 +148,7 @@ const Search = () => {
                 Results for: "{query}"
               </h1>
               <p className="text-sm text-muted-foreground">
-                Found {mockDocumentResults.length} documents
+                Found {mockDocumentResults.length} documents · Ranked by relevance to your query
               </p>
             </div>
             <PMButton
