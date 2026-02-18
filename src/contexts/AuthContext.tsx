@@ -30,27 +30,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Store provider tokens when user signs in via OAuth
-        // provider_token is available in the session passed to onAuthStateChange
-        if (event === "SIGNED_IN" && session?.provider_token) {
-          const tokenBody = {
-            access_token: session.provider_token,
-            refresh_token: session.provider_refresh_token || null,
-            expires_at: session.expires_at
-              ? new Date(session.expires_at * 1000).toISOString()
-              : null,
-          };
-          supabase.functions.invoke("store-oauth-tokens", {
-            body: tokenBody,
-          }).then(({ error }) => {
-            if (error) {
-              console.error("Failed to store OAuth tokens:", error);
-            } else {
-              console.log("OAuth tokens stored successfully");
-            }
-          }).catch((err) => {
-            console.error("Failed to store OAuth tokens:", err);
-          });
+        // Debug: log what's in the session on sign-in
+        if (event === "SIGNED_IN") {
+          console.log("[AuthContext] SIGNED_IN event fired");
+          console.log("[AuthContext] provider_token present:", !!session?.provider_token);
+          console.log("[AuthContext] provider_refresh_token present:", !!session?.provider_refresh_token);
+          
+          // Try from onAuthStateChange session first
+          let providerToken = session?.provider_token;
+          let providerRefreshToken = session?.provider_refresh_token;
+          
+          // If not available, try getSession() as fallback
+          if (!providerToken) {
+            console.log("[AuthContext] No provider_token in event session, trying getSession()...");
+            const { data: { session: freshSession } } = await supabase.auth.getSession();
+            console.log("[AuthContext] getSession provider_token present:", !!freshSession?.provider_token);
+            providerToken = freshSession?.provider_token;
+            providerRefreshToken = freshSession?.provider_refresh_token;
+          }
+          
+          if (providerToken) {
+            const tokenBody = {
+              access_token: providerToken,
+              refresh_token: providerRefreshToken || null,
+              expires_at: session?.expires_at
+                ? new Date(session.expires_at * 1000).toISOString()
+                : null,
+            };
+            supabase.functions.invoke("store-oauth-tokens", {
+              body: tokenBody,
+            }).then(({ error }) => {
+              if (error) {
+                console.error("[AuthContext] Failed to store OAuth tokens:", error);
+              } else {
+                console.log("[AuthContext] OAuth tokens stored successfully");
+              }
+            }).catch((err) => {
+              console.error("[AuthContext] Failed to store OAuth tokens:", err);
+            });
+          } else {
+            console.warn("[AuthContext] No provider_token available after sign-in. Google API features will not work until re-auth.");
+          }
         }
       }
     );
