@@ -144,7 +144,7 @@ const Search = () => {
           </button>
 
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="mb-6">
             <div>
               <h1 className="text-page-title text-foreground mb-1">
                 Results for: "{query}"
@@ -153,15 +153,6 @@ const Search = () => {
                 Found {mockDocumentResults.length} documents · Ranked by relevance to your query
               </p>
             </div>
-            <PMButton
-              variant="secondary"
-              onClick={handleSummarize}
-              loading={loadingSummary}
-              className="gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Summarize All
-            </PMButton>
           </div>
 
           {/* AI Summary */}
