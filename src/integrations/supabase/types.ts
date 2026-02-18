@@ -14,6 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          chunk_text: string
+          created_at: string
+          document_id: string
+          document_owner: string | null
+          document_title: string
+          document_type: string | null
+          document_url: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chunk_index: number
+          chunk_text: string
+          created_at?: string
+          document_id: string
+          document_owner?: string | null
+          document_title: string
+          document_type?: string | null
+          document_url?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chunk_index?: number
+          chunk_text?: string
+          created_at?: string
+          document_id?: string
+          document_owner?: string | null
+          document_title?: string
+          document_type?: string | null
+          document_url?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      meetings: {
+        Row: {
+          attendees: Json | null
+          brief: string | null
+          brief_generated_at: string | null
+          calendar_event_id: string
+          created_at: string
+          description: string | null
+          end_time: string
+          id: string
+          meeting_url: string | null
+          relevant_document_ids: string[] | null
+          start_time: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attendees?: Json | null
+          brief?: string | null
+          brief_generated_at?: string | null
+          calendar_event_id: string
+          created_at?: string
+          description?: string | null
+          end_time: string
+          id?: string
+          meeting_url?: string | null
+          relevant_document_ids?: string[] | null
+          start_time: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attendees?: Json | null
+          brief?: string | null
+          brief_generated_at?: string | null
+          calendar_event_id?: string
+          created_at?: string
+          description?: string | null
+          end_time?: string
+          id?: string
+          meeting_url?: string | null
+          relevant_document_ids?: string[] | null
+          start_time?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       oauth_tokens: {
         Row: {
           access_token: string
