@@ -1,1 +1,4 @@
 project_id = "nqdausnuvczxvocslzrj"
+
+[functions.store-oauth-tokens]
+verify_jwt = false
