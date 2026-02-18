@@ -20,7 +20,7 @@ const FeedbackModal = ({ open, onClose }: FeedbackModalProps) => {
   };
 
   return (
-    <PMModal open={open} onClose={onClose}>
+    <PMModal open={open} onClose={onClose} showCloseButton={false}>
       <PMModalHeader>
         <PMModalTitle>What were you looking for?</PMModalTitle>
       </PMModalHeader>
