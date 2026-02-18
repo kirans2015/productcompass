@@ -22,6 +22,15 @@ interface DocumentDetailPanelProps {
   query: string;
 }
 
+const getFileTypeLabel = (type: string) => {
+  switch (type) {
+    case "doc": return "Google Docs";
+    case "slides": return "Google Slides";
+    case "sheet": return "Google Sheets";
+    default: return "Document";
+  }
+};
+
 const getFileIcon = (type: string) => {
   switch (type) {
     case "doc":
@@ -51,6 +60,7 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
           <div className="flex items-center gap-3">
             {getFileIcon(doc.type)}
             <SheetTitle className="text-lg">{doc.title}</SheetTitle>
+            <PMBadge variant="default" className="shrink-0">{getFileTypeLabel(doc.type)}</PMBadge>
           </div>
           <SheetDescription className="sr-only">Document details</SheetDescription>
         </SheetHeader>
@@ -64,7 +74,7 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
             <User className="h-3.5 w-3.5" />{doc.owner}
           </PMBadge>
           <PMBadge variant="default" className="gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />{doc.lastEdited}
+            <Calendar className="h-3.5 w-3.5" />Last edited {doc.lastEdited}
           </PMBadge>
           {doc.folder && (
             <PMBadge variant="default" className="gap-1.5">
@@ -76,6 +86,9 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
         {/* Why this matched */}
         <div className="flex-1 overflow-y-auto mt-6 space-y-3">
           <h4 className="text-sm font-medium text-foreground">Why this matched "{query}"</h4>
+          {doc.excerpts && doc.excerpts.length > 0 && (
+            <p className="text-xs text-muted-foreground">{doc.excerpts.length} matching passage{doc.excerpts.length !== 1 ? "s" : ""} found</p>
+          )}
           {doc.excerpts?.map((excerpt, i) => (
             <div key={i} className="bg-muted rounded-md p-3 flex gap-2">
               <Quote className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
