@@ -56,7 +56,7 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="right" className="sm:max-w-md flex flex-col">
-        <SheetHeader className="text-left">
+        <SheetHeader className="text-left pr-8">
           <div className="flex items-center gap-3">
             {getFileIcon(doc.type)}
             <SheetTitle className="text-lg">{doc.title}</SheetTitle>
