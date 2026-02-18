@@ -1,32 +1,84 @@
 
+# Fix Auth Redirect Flow
 
-## Add Document Details Slide-Out Panel
+## Problem
+After Google sign-in, users are redirected back to the landing page instead of the dashboard. There are also no route guards to protect authenticated/unauthenticated routes.
 
-Create a slide-out panel that appears from the right when "View Details" is clicked on a search result card.
+## Root Cause
+The `AuthCallback` page calls `supabase.auth.getSession()` immediately, but the OAuth session may not be fully established yet from the hash fragment. Additionally, no components enforce route protection.
 
-### New Component
+## Plan
 
-**`src/components/search/DocumentDetailPanel.tsx`**
-- A right-side slide-out panel using the existing `Sheet` component from `@/components/ui/sheet`
-- Props: `doc: DocumentResult | null`, `open: boolean`, `onClose: () => void`, `query: string`
-- Panel contents from top to bottom:
-  1. **Header**: File type icon + document title + close X button (provided by Sheet)
-  2. **Metadata row**: Match percentage badge (PMBadge), owner name, last edited date, folder location (mock: e.g. "My Drive / Product")
-  3. **"Why this matched" section**: Label heading, then 2-3 excerpt cards — each in a light gray rounded card (`bg-muted`) with a small `Quote` icon from lucide-react and a text passage. Excerpts will be mock data added to the `DocumentResult` interface or defined inline per document.
-  4. **Footer**: A full-width blue "Open in Google Drive" PMButton with `ExternalLink` icon
+### 1. Create a `ProtectedRoute` component
+A wrapper that checks auth state and redirects unauthenticated users to `/`.
 
-### Changes to Existing Files
+**New file: `src/components/ProtectedRoute.tsx`**
+- Uses `useAuth()` to check `user` and `loading`
+- While loading, shows a spinner
+- If no user, redirects to `/`
+- Otherwise, renders children
 
-**`src/pages/Search.tsx`**
-- Add `selectedDoc` state (`DocumentResult | null`) to track which document's panel is open
-- Wire the "View Details" button's `onClick` to set `selectedDoc` to that document
-- Render `DocumentDetailPanel` at the bottom of the component, passing `open={!!selectedDoc}`, `doc={selectedDoc}`, `onClose={() => setSelectedDoc(null)}`, and `query`
-- Add mock excerpt data to `mockDocumentResults` (new `excerpts: string[]` field on the interface) so each document has 2-3 relevant passages
+### 2. Create a `PublicRoute` component (for Landing page)
+A wrapper that redirects authenticated users to `/dashboard`.
+
+**New file: `src/components/PublicRoute.tsx`**
+- Uses `useAuth()` to check `user` and `loading`
+- While loading, shows a spinner
+- If user exists, redirects to `/dashboard`
+- Otherwise, renders children
+
+### 3. Fix `AuthCallback.tsx`
+The current implementation may check `getSession()` before the OAuth hash is processed. Fix it to:
+- Listen for the `onAuthStateChange` event instead of polling `getSession()`
+- Navigate to `/dashboard` on `SIGNED_IN` event
+- Add a timeout fallback to redirect to `/` if no session after a few seconds
+
+### 4. Update `App.tsx` routes
+- Wrap `/` (Landing) with `PublicRoute`
+- Wrap `/dashboard`, `/search`, `/meeting-prep/:meetingId`, `/settings` with `ProtectedRoute`
+- Leave `/onboarding`, `/auth/callback`, and `*` unwrapped
+
+### 5. Update Landing page
+- Add `useAuth` import and redirect logic is handled by `PublicRoute`, so no changes needed in `Landing.tsx` itself.
+
+---
 
 ### Technical Details
 
-- Uses the existing `Sheet`/`SheetContent` component with `side="right"` for the slide-out behavior and built-in close X button
-- Adds `Quote` icon import from `lucide-react`
-- Extends `DocumentResult` interface with optional `excerpts` and `folder` fields
-- No new dependencies required
+**ProtectedRoute.tsx:**
+```tsx
+const { user, loading } = useAuth();
+if (loading) return <Loader />;
+if (!user) return <Navigate to="/" replace />;
+return children;
+```
 
+**PublicRoute.tsx:**
+```tsx
+const { user, loading } = useAuth();
+if (loading) return <Loader />;
+if (user) return <Navigate to="/dashboard" replace />;
+return children;
+```
+
+**AuthCallback.tsx fix:**
+```tsx
+useEffect(() => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" && session) {
+      navigate("/dashboard", { replace: true });
+    }
+  });
+  // Fallback timeout
+  const timeout = setTimeout(() => navigate("/", { replace: true }), 5000);
+  return () => { subscription.unsubscribe(); clearTimeout(timeout); };
+}, [navigate]);
+```
+
+### Files Changed
+| File | Action |
+|------|--------|
+| `src/components/ProtectedRoute.tsx` | Create |
+| `src/components/PublicRoute.tsx` | Create |
+| `src/pages/AuthCallback.tsx` | Modify |
+| `src/App.tsx` | Modify |
