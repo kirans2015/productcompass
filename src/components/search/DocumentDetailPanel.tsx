@@ -56,14 +56,20 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
         </SheetHeader>
 
         {/* Metadata */}
-        <div className="flex flex-wrap gap-3 items-center text-sm text-muted-foreground mt-2">
+        <div className="flex flex-wrap gap-2 items-center mt-2">
           <PMBadge variant={getScoreBadgeVariant(doc.matchScore)}>
             {doc.matchScore}% match
           </PMBadge>
-          <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{doc.owner}</span>
-          <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{doc.lastEdited}</span>
+          <PMBadge variant="default" className="gap-1.5">
+            <User className="h-3.5 w-3.5" />{doc.owner}
+          </PMBadge>
+          <PMBadge variant="default" className="gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />{doc.lastEdited}
+          </PMBadge>
           {doc.folder && (
-            <span className="flex items-center gap-1"><Folder className="h-3.5 w-3.5" />{doc.folder}</span>
+            <PMBadge variant="default" className="gap-1.5">
+              <Folder className="h-3.5 w-3.5" />{doc.folder}
+            </PMBadge>
           )}
         </div>
 
