@@ -29,14 +29,31 @@ const Landing = () => {
           scope: GOOGLE_SCOPES,
         },
       });
+      
+      console.log("[Landing] signInWithOAuth result:", {
+        redirected: result.redirected,
+        hasError: !!result.error,
+        hasTokens: !!result.tokens,
+      });
+
+      if (result.redirected) {
+        // Page is being redirected, nothing more to do
+        return;
+      }
+      
       if (result.error) {
         toast.error("Sign-in failed. Please try again.");
         console.error("OAuth error:", result.error);
+        setSigningIn(false);
+        return;
       }
+      
+      // Sign-in succeeded — explicitly navigate to dashboard
+      console.log("[Landing] Sign-in successful, navigating to dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       toast.error("Sign-in failed. Please try again.");
       console.error("OAuth error:", err);
-    } finally {
       setSigningIn(false);
     }
   };

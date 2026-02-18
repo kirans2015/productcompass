@@ -81,14 +81,20 @@ const Onboarding = () => {
         },
       });
 
+      if (result.redirected) return;
+
       if (result.error) {
         toast.error("Sign-in failed. Please try again.");
         console.error("OAuth error:", result.error);
+        setSigningIn(false);
+        return;
       }
+
+      // Sign-in succeeded — navigate to dashboard
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       toast.error("Sign-in failed. Please try again.");
       console.error("OAuth error:", err);
-    } finally {
       setSigningIn(false);
     }
   };
