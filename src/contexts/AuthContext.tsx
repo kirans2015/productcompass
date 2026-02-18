@@ -85,7 +85,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear local session state first
+    setUser(null);
+    setSession(null);
+    
+    // Then clear Supabase session (don't await to avoid hanging)
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    
+    // Force clear any stored auth tokens
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith('sb-')) {
+        localStorage.removeItem(key);
+      }
+    });
   };
 
   return (
