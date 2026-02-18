@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
+import FeedbackModal from "@/components/search/FeedbackModal";
 import { PMButton } from "@/components/ui/pm-button";
 import { PMBadge } from "@/components/ui/pm-badge";
 import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, X, Loader2 } from "lucide-react";
@@ -66,6 +67,7 @@ const Search = () => {
   const [summaryText, setSummaryText] = useState("");
   const [summarizingDocId, setSummarizingDocId] = useState<number | null>(null);
   const [docSummaries, setDocSummaries] = useState<Record<number, string>>({});
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -259,6 +261,18 @@ const Search = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* Feedback Link */}
+          <div className="pt-6 text-center">
+            <button
+              onClick={() => setFeedbackOpen(true)}
+              className="text-sm text-muted-foreground hover:text-primary transition-colors underline underline-offset-4"
+            >
+              Can't find what you need?
+            </button>
+          </div>
+
+          <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
         </motion.div>
       </main>
     </div>
