@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.index-documents]
 verify_jwt = false
+
+[functions.search-documents]
+verify_jwt = false
