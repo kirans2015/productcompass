@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { PMButton } from "@/components/ui/pm-button";
+import { PMBadge } from "@/components/ui/pm-badge";
 import { PMModal, PMModalHeader, PMModalTitle, PMModalDescription, PMModalContent, PMModalFooter } from "@/components/ui/pm-modal";
 import { PMInput } from "@/components/ui/pm-input";
 import { ArrowLeft, Check, AlertTriangle } from "lucide-react";
@@ -118,6 +119,22 @@ const Settings = () => {
               <PMButton variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
                 Re-index Now
               </PMButton>
+            </div>
+          </section>
+
+          {/* Usage This Month */}
+          <section className="mb-8">
+            <h2 className="text-caption text-muted-foreground mb-4">USAGE THIS MONTH</h2>
+            <div className="p-4 bg-card border border-border rounded-md space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Searches</span>
+                <span className="text-sm text-foreground">32</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Meeting preps</span>
+                <span className="text-sm text-foreground">8</span>
+              </div>
+              <PMBadge variant="success">Beta — Unlimited access</PMBadge>
             </div>
           </section>
 
