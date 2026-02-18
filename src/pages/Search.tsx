@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import FeedbackModal from "@/components/search/FeedbackModal";
+import DocumentDetailPanel from "@/components/search/DocumentDetailPanel";
 import { PMButton } from "@/components/ui/pm-button";
 import { PMBadge } from "@/components/ui/pm-badge";
 import { ArrowLeft, FileText, Presentation, Sheet, ExternalLink, Sparkles, X, Loader2 } from "lucide-react";
@@ -17,6 +18,8 @@ interface DocumentResult {
   lastEdited: string;
   owner: string;
   snippet: string;
+  excerpts?: string[];
+  folder?: string;
 }
 
 const mockDocumentResults: DocumentResult[] = [
@@ -28,6 +31,12 @@ const mockDocumentResults: DocumentResult[] = [
     lastEdited: "Oct 15, 2024",
     owner: "You",
     snippet: "Key initiatives for Q3 include launching the new dashboard, improving search performance, and expanding to mobile platforms...",
+    folder: "My Drive / Product",
+    excerpts: [
+      "Key initiatives for Q3 include launching the new dashboard, improving search performance, and expanding to mobile platforms.",
+      "The product requirements specify that all new features must pass accessibility audits before release.",
+      "Stakeholder alignment on the roadmap was achieved during the July planning sprint.",
+    ],
   },
   {
     id: 2,
@@ -37,6 +46,11 @@ const mockDocumentResults: DocumentResult[] = [
     lastEdited: "Oct 18, 2024",
     owner: "Sarah Chen",
     snippet: "Quarterly roadmap overview presented to leadership team covering product strategy and resource allocation...",
+    folder: "Shared / Leadership",
+    excerpts: [
+      "Quarterly roadmap overview presented to leadership team covering product strategy and resource allocation.",
+      "Product requirements were reviewed and prioritized based on customer feedback and revenue impact.",
+    ],
   },
   {
     id: 3,
@@ -46,6 +60,11 @@ const mockDocumentResults: DocumentResult[] = [
     lastEdited: "Sep 28, 2024",
     owner: "Mike Johnson",
     snippet: "Feature scoring matrix with impact vs effort analysis for Q3 and Q4 planning cycles...",
+    folder: "My Drive / Planning",
+    excerpts: [
+      "Feature scoring matrix with impact vs effort analysis for Q3 and Q4 planning cycles.",
+      "Each requirement was scored on a 1-5 scale across customer value, technical complexity, and strategic alignment.",
+    ],
   },
   {
     id: 4,
@@ -55,6 +74,12 @@ const mockDocumentResults: DocumentResult[] = [
     lastEdited: "Aug 15, 2024",
     owner: "You",
     snippet: "Long-term product vision and strategy document outlining roadmap themes for the next 12 months...",
+    folder: "My Drive / Strategy",
+    excerpts: [
+      "Long-term product vision and strategy document outlining roadmap themes for the next 12 months.",
+      "Core product requirements include scalability, multi-tenant support, and enterprise-grade security.",
+      "The strategy emphasizes iterative delivery with quarterly requirement reviews.",
+    ],
   },
 ];
 
@@ -68,6 +93,7 @@ const Search = () => {
   const [summarizingDocId, setSummarizingDocId] = useState<number | null>(null);
   const [docSummaries, setDocSummaries] = useState<Record<number, string>>({});
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState<DocumentResult | null>(null);
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -239,7 +265,7 @@ const Search = () => {
                           )}
                           {summarizingDocId === doc.id ? "Summarizing..." : "Summarize"}
                         </PMButton>
-                        <PMButton variant="ghost" size="sm">
+                        <PMButton variant="ghost" size="sm" onClick={() => setSelectedDoc(doc)}>
                           View Details
                         </PMButton>
                       </div>
@@ -264,6 +290,12 @@ const Search = () => {
           </div>
 
           <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+          <DocumentDetailPanel
+            doc={selectedDoc}
+            open={!!selectedDoc}
+            onClose={() => setSelectedDoc(null)}
+            query={query}
+          />
         </motion.div>
       </main>
     </div>
