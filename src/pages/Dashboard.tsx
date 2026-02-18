@@ -1,24 +1,70 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { PMSearchBar } from "@/components/ui/pm-search-bar";
 import { PMCard, PMCardHeader, PMCardTitle, PMCardContent, PMCardFooter } from "@/components/ui/pm-card";
 import { PMButton } from "@/components/ui/pm-button";
-import { Calendar, Clock, ChevronRight } from "lucide-react";
-import { motion } from "framer-motion";
+import { Calendar, Clock, ChevronRight, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { format, isToday, isTomorrow } from "date-fns";
+
+const RECENT_SEARCHES_KEY = "pm-compass-recent-searches";
+const INDEXED_FLAG_KEY = "pm-compass-indexed";
+
+function getUserDisplayName(user: any): string {
+  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name;
+  if (fullName) return fullName.split(" ")[0];
+  const email = user?.email;
+  if (email) return email.split("@")[0];
+  return "there";
+}
+
+function formatMeetingTime(startTime: string): string {
+  const date = new Date(startTime);
+  const timeStr = format(date, "h:mm a");
+  if (isToday(date)) return `Today at ${timeStr}`;
+  if (isTomorrow(date)) return `Tomorrow at ${timeStr}`;
+  return format(date, "EEE") + ` at ${timeStr}`;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
   const [greeting, setGreeting] = useState("Good morning");
   const [showTip, setShowTip] = useState(true);
+
+  // Indexing state
+  const [indexing, setIndexing] = useState(false);
+  const [indexProgress, setIndexProgress] = useState<{ processed: number; total: number } | null>(null);
+  const [indexComplete, setIndexComplete] = useState(false);
+
+  // Meetings state
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [meetingsLoading, setMeetingsLoading] = useState(true);
+  const [meetingsError, setMeetingsError] = useState<string | null>(null);
+
+  // Recent searches from localStorage
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  const displayName = getUserDisplayName(user);
 
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) setGreeting("Good morning");
     else if (hour >= 12 && hour < 17) setGreeting("Good afternoon");
     else setGreeting("Good evening");
+  }, []);
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+      if (stored) setRecentSearches(JSON.parse(stored));
+    } catch {}
   }, []);
 
   // Keyboard shortcut for search
@@ -37,30 +83,108 @@ const Dashboard = () => {
   useEffect(() => {
     if (showTip) {
       const timer = setTimeout(() => {
-        toast.info("Pro tip: Press ⌘K to search anytime", {
-          duration: 4000,
-        });
+        toast.info("Pro tip: Press ⌘K to search anytime", { duration: 4000 });
         setShowTip(false);
       }, 1500);
       return () => clearTimeout(timer);
     }
   }, [showTip]);
 
+  // Document indexing check
+  const runIndexing = useCallback(async (offset = 0) => {
+    setIndexing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("index-documents", {
+        body: { offset },
+      });
+      if (error) throw error;
+
+      const totalProcessed = offset + (data.processed || 0);
+      setIndexProgress({ processed: totalProcessed, total: data.total || 0 });
+
+      if (data.status === "in_progress" && data.remaining > 0) {
+        await runIndexing(totalProcessed);
+      } else {
+        setIndexing(false);
+        setIndexComplete(true);
+        localStorage.setItem(INDEXED_FLAG_KEY, "true");
+        setTimeout(() => setIndexComplete(false), 4000);
+      }
+    } catch (err: any) {
+      console.error("Indexing error:", err);
+      setIndexing(false);
+      toast.error("Failed to index documents. Please try again from Settings.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const alreadyIndexed = localStorage.getItem(INDEXED_FLAG_KEY);
+    if (alreadyIndexed) return;
+
+    // Check if user has any document chunks
+    const checkAndIndex = async () => {
+      const { count } = await supabase
+        .from("document_chunks")
+        .select("id", { count: "exact", head: true });
+
+      if (count === 0) {
+        runIndexing();
+      } else {
+        localStorage.setItem(INDEXED_FLAG_KEY, "true");
+      }
+    };
+    checkAndIndex();
+  }, [user, runIndexing]);
+
+  // Sync calendar meetings
+  useEffect(() => {
+    if (!user) return;
+    const syncMeetings = async () => {
+      setMeetingsLoading(true);
+      setMeetingsError(null);
+      try {
+        const { data, error } = await supabase.functions.invoke("sync-calendar");
+        if (error) {
+          // Check for 401 in the error
+          if (error.message?.includes("401") || error.message?.includes("expired")) {
+            setMeetingsError("expired");
+          } else {
+            throw error;
+          }
+          return;
+        }
+        if (data?.error && (data.error.includes("expired") || data.error.includes("token"))) {
+          setMeetingsError("expired");
+          return;
+        }
+        setMeetings(data?.meetings || []);
+      } catch (err) {
+        console.error("Calendar sync error:", err);
+        setMeetingsError("failed");
+      } finally {
+        setMeetingsLoading(false);
+      }
+    };
+    syncMeetings();
+  }, [user]);
+
   const handleSearch = (query: string) => {
+    // Save to recent searches
+    const updated = [query, ...recentSearches.filter((s) => s !== query)].slice(0, 5);
+    setRecentSearches(updated);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
     navigate(`/search?q=${encodeURIComponent(query)}`);
   };
 
-  const upcomingMeetings = [
-    { id: "meeting-1", title: "Daily Standup", time: "in 30 min" },
-    { id: "meeting-2", title: "1:1 with Sarah", time: "2:00 PM" },
-    { id: "meeting-3", title: "Sprint Planning", time: "4:00 PM" },
-  ];
-
-  const recentSearches = ["Q3 roadmap", "product requirements", "competitor analysis"];
+  const clearSearchHistory = () => {
+    setRecentSearches([]);
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar isAuthenticated userName="Alex" />
+      <Navbar isAuthenticated userName={displayName} />
 
       <main className="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <motion.div
@@ -70,9 +194,39 @@ const Dashboard = () => {
         >
           {/* Greeting */}
           <div className="text-center mb-8">
-            <h1 className="text-page-title text-foreground mb-2">{greeting}, Alex</h1>
+            <h1 className="text-page-title text-foreground mb-2">{greeting}, {displayName}</h1>
             <p className="text-body text-muted-foreground">Here's what's on your radar today</p>
           </div>
+
+          {/* Indexing Status Banner */}
+          <AnimatePresence>
+            {indexing && indexProgress && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-6 flex items-center gap-3 rounded-lg border border-border bg-secondary-bg px-4 py-3"
+              >
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-sm text-foreground">
+                  Indexing your documents... ({indexProgress.processed} of {indexProgress.total} processed)
+                </span>
+              </motion.div>
+            )}
+            {indexComplete && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-6 flex items-center gap-3 rounded-lg border border-border bg-secondary-bg px-4 py-3"
+              >
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                <span className="text-sm text-foreground">
+                  ✓ {indexProgress?.total || 0} documents indexed
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Search Bar */}
           <div className="mb-12">
@@ -92,21 +246,43 @@ const Dashboard = () => {
                 <PMCardTitle>Upcoming Meetings</PMCardTitle>
               </PMCardHeader>
               <PMCardContent>
-                <div className="space-y-1">
-                  {upcomingMeetings.map((meeting) => (
-                    <button
-                      key={meeting.id}
-                      onClick={() => navigate(`/meeting-prep/${meeting.id}`)}
-                      className="w-full flex items-center justify-between p-2 -mx-2 rounded-md hover:bg-secondary-bg transition-colors group"
-                    >
-                      <span className="text-sm text-foreground">{meeting.title}</span>
-                      <span className="text-small text-muted-foreground group-hover:text-foreground flex items-center gap-1">
-                        {meeting.time}
-                        <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                {meetingsLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : meetingsError === "expired" ? (
+                  <div className="flex items-center gap-2 py-4 text-sm text-warning">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>Your Google connection has expired. <button onClick={() => navigate("/settings")} className="underline hover:text-foreground">Reconnect in Settings</button>.</span>
+                  </div>
+                ) : meetingsError ? (
+                  <p className="text-sm text-muted-foreground py-4">Failed to load meetings.</p>
+                ) : meetings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">No meetings in the next 7 days</p>
+                ) : (
+                  <div className="space-y-1">
+                    {meetings.map((meeting) => (
+                      <button
+                        key={meeting.id}
+                        onClick={() => navigate(`/meeting-prep/${meeting.id}`)}
+                        className="w-full flex items-center justify-between p-2 -mx-2 rounded-md hover:bg-secondary-bg transition-colors group"
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="text-sm text-foreground">{meeting.title}</span>
+                          {meeting.attendees && (
+                            <span className="text-xs text-muted-foreground">
+                              {Array.isArray(meeting.attendees) ? meeting.attendees.length : 0} attendees
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-small text-muted-foreground group-hover:text-foreground flex items-center gap-1">
+                          {formatMeetingTime(meeting.start_time)}
+                          <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </PMCardContent>
               <PMCardFooter>
                 <button className="text-sm text-primary hover:underline">
@@ -122,22 +298,31 @@ const Dashboard = () => {
                 <PMCardTitle>Recent Searches</PMCardTitle>
               </PMCardHeader>
               <PMCardContent>
-                <div className="space-y-1">
-                  {recentSearches.map((search) => (
-                    <button
-                      key={search}
-                      onClick={() => handleSearch(search)}
-                      className="w-full text-left p-2 -mx-2 rounded-md hover:bg-secondary-bg transition-colors group"
-                    >
-                      <span className="text-sm text-foreground">"{search}"</span>
-                    </button>
-                  ))}
-                </div>
+                {recentSearches.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">Your recent searches will appear here.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {recentSearches.map((search) => (
+                      <button
+                        key={search}
+                        onClick={() => handleSearch(search)}
+                        className="w-full text-left p-2 -mx-2 rounded-md hover:bg-secondary-bg transition-colors group"
+                      >
+                        <span className="text-sm text-foreground">"{search}"</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </PMCardContent>
               <PMCardFooter>
-                <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Clear history
-                </button>
+                {recentSearches.length > 0 && (
+                  <button
+                    onClick={clearSearchHistory}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Clear history
+                  </button>
+                )}
               </PMCardFooter>
             </PMCard>
           </div>
