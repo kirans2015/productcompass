@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.search-documents]
 verify_jwt = false
+
+[functions.sync-calendar]
+verify_jwt = false
+
+[functions.prepare-meeting]
+verify_jwt = false
