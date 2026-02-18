@@ -106,6 +106,23 @@ const Settings = () => {
 
           <hr className="border-border mb-8" />
 
+          {/* Indexing Status */}
+          <section className="mb-8">
+            <h2 className="text-caption text-muted-foreground mb-4">INDEXING STATUS</h2>
+            <div className="p-4 bg-card border border-border rounded-md space-y-3">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-success" />
+                <span className="text-sm text-foreground">156 documents indexed</span>
+              </div>
+              <p className="text-small text-muted-foreground">Last synced: 2 minutes ago</p>
+              <PMButton variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
+                Re-index Now
+              </PMButton>
+            </div>
+          </section>
+
+          <hr className="border-border mb-8" />
+
           {/* Account */}
           <section className="mb-8">
             <h2 className="text-caption text-muted-foreground mb-4">ACCOUNT</h2>
