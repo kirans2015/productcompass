@@ -29,9 +29,6 @@ const Landing = () => {
           scope: GOOGLE_SCOPES,
         },
       });
-      console.log("[Landing] OAuth result keys:", result ? Object.keys(result) : "null");
-      console.log("[Landing] OAuth result.tokens keys:", result?.tokens ? Object.keys(result.tokens) : "no tokens");
-      console.log("[Landing] Full result:", JSON.stringify(result, null, 2));
       if (result.error) {
         toast.error("Sign-in failed. Please try again.");
         console.error("OAuth error:", result.error);
