@@ -13,6 +13,7 @@ interface DocumentResult {
   snippet: string;
   excerpts?: string[];
   folder?: string;
+  url?: string;
 }
 
 interface DocumentDetailPanelProps {
@@ -69,12 +70,16 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
           <PMBadge variant={getScoreBadgeVariant(doc.matchScore)}>
             {doc.matchScore}% match
           </PMBadge>
-          <PMBadge variant="default" className="gap-1.5">
-            <User className="h-3.5 w-3.5" />{doc.owner}
-          </PMBadge>
-          <PMBadge variant="default" className="gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />Last edited {doc.lastEdited}
-          </PMBadge>
+          {doc.owner && (
+            <PMBadge variant="default" className="gap-1.5">
+              <User className="h-3.5 w-3.5" />{doc.owner}
+            </PMBadge>
+          )}
+          {doc.lastEdited && (
+            <PMBadge variant="default" className="gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />Last edited {doc.lastEdited}
+            </PMBadge>
+          )}
           {doc.folder && (
             <PMBadge variant="default" className="gap-1.5">
               <Folder className="h-3.5 w-3.5" />{doc.folder}
@@ -98,7 +103,12 @@ const DocumentDetailPanel = ({ doc, open, onClose, query }: DocumentDetailPanelP
 
         {/* Footer */}
         <div className="pt-4 border-t border-border mt-4">
-          <PMButton variant="primary" className="w-full gap-2">
+          <PMButton
+            variant="primary"
+            className="w-full gap-2"
+            onClick={() => doc.url && window.open(doc.url, "_blank")}
+            disabled={!doc.url}
+          >
             <ExternalLink className="h-4 w-4" />
             Open in Google Drive
           </PMButton>
