@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
     const { data: matches, error: matchError } = await serviceClient.rpc("match_documents", {
       query_embedding: queryEmbedding,
-      match_count: 5,
+      match_count: 10,
       match_threshold: 0.3,
       user_uuid: user.id,
     });
@@ -100,12 +100,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3. Build context for Claude
-    const chunksContext = matches
+    // 3. Deduplicate: keep highest-similarity chunk per document
+    const seenDocs = new Map();
+    for (const m of matches) {
+      if (!seenDocs.has(m.document_id) || m.similarity > seenDocs.get(m.document_id).similarity) {
+        seenDocs.set(m.document_id, m);
+      }
+    }
+    const uniqueMatches = Array.from(seenDocs.values());
+
+    // 4. Build context for Claude
+    const chunksContext = uniqueMatches
       .map((m: any) => `[Document: ${m.document_title}]\n${m.chunk_text}`)
       .join("\n\n---\n\n");
 
-    // 4. Call Claude for synthesis
+    // 5. Call Claude for synthesis
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -135,8 +144,8 @@ Deno.serve(async (req) => {
       console.error("Claude API error:", claudeRes.status, await claudeRes.text());
     }
 
-    // 5. Build sources
-    const sources = matches.map((m: any) => ({
+    // 6. Build sources
+    const sources = uniqueMatches.map((m: any) => ({
       document_id: m.document_id,
       document_title: m.document_title,
       document_type: m.document_type,
