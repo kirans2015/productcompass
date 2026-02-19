@@ -49,14 +49,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    // Clear local session state first
+    // Delete oauth tokens so next sign-in re-triggers consent
+    if (user?.id) {
+      supabase.from("oauth_tokens").delete().eq("user_id", user.id).then(() => {});
+    }
+
     setUser(null);
     setSession(null);
-    
-    // Then clear Supabase session (don't await to avoid hanging)
+
     supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-    
-    // Force clear any stored auth tokens
+
+    // Clear local flags
+    localStorage.removeItem("pm-compass-indexed");
+    localStorage.removeItem("pm-compass-recent-searches");
+
     const keys = Object.keys(localStorage);
     keys.forEach(key => {
       if (key.startsWith('sb-')) {
