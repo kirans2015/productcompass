@@ -118,7 +118,21 @@ const Search = () => {
   };
 
   const handleSummarizeDoc = async (doc: DocumentResult) => {
-    toast.info("AI summarization is not currently available.");
+    setSummarizingDocId(doc.id);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("search-documents", {
+        body: { query: `Summarize the key points of ${doc.title}` },
+      });
+      if (fnError) throw fnError;
+      if (data?.answer) {
+        setDocSummaries((prev) => ({ ...prev, [doc.id]: data.answer }));
+      }
+    } catch (err) {
+      console.error("Summarize error:", err);
+      toast.error("Failed to summarize document.");
+    } finally {
+      setSummarizingDocId(null);
+    }
   };
 
   return (
