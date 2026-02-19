@@ -37,7 +37,14 @@ export async function signInWithGoogle(): Promise<{
       return { success: false, error: result.error };
     }
 
-    // Google API tokens are acquired lazily when needed (on Dashboard)
+    // Auto-trigger Google API token acquisition (second consent popup)
+    console.log("[google-auth] Session established. Auto-acquiring Google API tokens...");
+    // Don't block sign-in on token acquisition — fire and forget
+    acquireGoogleTokens().then((ok) => {
+      if (ok) console.log("[google-auth] Google API tokens acquired successfully");
+      else console.warn("[google-auth] Google API token acquisition skipped or failed");
+    });
+
     return { success: true };
   } catch (err) {
     console.error("[google-auth] Error:", err);
