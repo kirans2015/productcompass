@@ -264,6 +264,12 @@ Deno.serve(async (req) => {
         .eq("provider", "google");
     }
 
+    // Clean slate: delete all existing chunks for this user before re-indexing
+    await serviceClient
+      .from("document_chunks")
+      .delete()
+      .eq("user_id", user.id);
+
     // List files from Google Drive
     const mimeQuery = DRIVE_MIME_TYPES.map((m) => `mimeType='${m}'`).join(" or ");
     const listUrl = `https://www.googleapis.com/drive/v3/files?q=(${encodeURIComponent(mimeQuery)}) and trashed=false&orderBy=modifiedTime desc&pageSize=50&fields=files(id,name,mimeType,owners)`;
