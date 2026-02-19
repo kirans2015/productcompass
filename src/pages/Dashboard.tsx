@@ -233,7 +233,7 @@ const Dashboard = () => {
             <p className="text-body text-muted-foreground">Here's what's on your radar today</p>
           </div>
 
-          {/* Google Connect Banner */}
+          {/* Google Connect Banner - fallback if auto-trigger was missed */}
           {hasGoogleTokens === false && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
