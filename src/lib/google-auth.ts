@@ -9,9 +9,9 @@ const GOOGLE_SCOPES = [
 ].join(" ");
 
 /**
- * Step 1: Sign in with Google via Lovable Cloud auth (creates Supabase session).
- * Step 2: Open a separate Google OAuth consent popup to get an auth code,
- *         then exchange it server-side for Google API tokens.
+ * Sign in with Google via Lovable Cloud auth (creates Supabase session).
+ * After session is established, redirects to Google consent for API tokens
+ * (Drive, Calendar) as a full-page redirect — no popup.
  */
 export async function signInWithGoogle(): Promise<{
   success: boolean;
@@ -19,7 +19,9 @@ export async function signInWithGoogle(): Promise<{
   error?: Error;
 }> {
   try {
-    // Step 1: Lovable Cloud sign-in (Supabase session)
+    // Mark that we need to acquire Google API tokens after auth completes
+    sessionStorage.setItem("google_tokens_pending", "true");
+
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
       extraParams: {
@@ -34,38 +36,84 @@ export async function signInWithGoogle(): Promise<{
     }
 
     if (result.error) {
+      sessionStorage.removeItem("google_tokens_pending");
       return { success: false, error: result.error };
     }
 
-    // Auto-trigger Google API token acquisition (second consent popup)
-    console.log("[google-auth] Session established. Auto-acquiring Google API tokens...");
-    // Don't block sign-in on token acquisition — fire and forget
-    acquireGoogleTokens().then((ok) => {
-      if (ok) console.log("[google-auth] Google API tokens acquired successfully");
-      else console.warn("[google-auth] Google API token acquisition skipped or failed");
-    });
-
     return { success: true };
   } catch (err) {
+    sessionStorage.removeItem("google_tokens_pending");
     console.error("[google-auth] Error:", err);
     return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
 }
 
 /**
- * Opens a Google OAuth consent popup to get an authorization code,
- * then sends it to the backend to exchange for Google API tokens.
- * Can be called independently to re-authorize Google API access.
+ * Redirects the user to Google consent to get an authorization code.
+ * The callback page (AuthCallback) handles the exchange.
+ * Uses full-page redirect instead of a popup.
  */
-export async function acquireGoogleTokens(): Promise<boolean> {
+export async function startGoogleTokenRedirect(): Promise<void> {
   const redirectUri = `${window.location.origin}/auth/callback`;
   const state = crypto.randomUUID();
 
-  // Store state for CSRF validation
+  sessionStorage.setItem("google_oauth_state", state);
+
+  const { data, error } = await supabase.functions.invoke("get-google-auth-url", {
+    body: { redirect_uri: redirectUri, state },
+  });
+
+  if (error || !data?.url) {
+    console.error("[google-auth] Failed to get auth URL:", error || data);
+    throw new Error("Failed to get Google auth URL");
+  }
+
+  // Full-page redirect — feels like one continuous flow
+  window.location.href = data.url;
+}
+
+/**
+ * Called from AuthCallback after receiving the Google auth code via redirect.
+ * Exchanges the code for tokens on the backend.
+ */
+export async function exchangeGoogleCode(code: string, state: string): Promise<boolean> {
+  const savedState = sessionStorage.getItem("google_oauth_state");
+  sessionStorage.removeItem("google_oauth_state");
+
+  if (state !== savedState) {
+    console.error("[google-auth] State mismatch");
+    return false;
+  }
+
+  const redirectUri = `${window.location.origin}/auth/callback`;
+
+  try {
+    const { error } = await supabase.functions.invoke("google-oauth-exchange", {
+      body: { code, redirect_uri: redirectUri },
+    });
+
+    if (error) {
+      console.error("[google-auth] Token exchange failed:", error);
+      return false;
+    }
+
+    console.log("[google-auth] Google API tokens stored successfully");
+    return true;
+  } catch (err) {
+    console.error("[google-auth] Token exchange error:", err);
+    return false;
+  }
+}
+
+/**
+ * Opens a Google OAuth consent popup (fallback for re-auth from Settings/Dashboard).
+ */
+export async function acquireGoogleTokensPopup(): Promise<boolean> {
+  const redirectUri = `${window.location.origin}/auth/callback`;
+  const state = crypto.randomUUID();
   sessionStorage.setItem("google_oauth_state", state);
 
   try {
-    // Get the Google OAuth URL from the backend (keeps client_id server-side)
     const { data, error } = await supabase.functions.invoke("get-google-auth-url", {
       body: { redirect_uri: redirectUri, state },
     });
@@ -88,7 +136,6 @@ export async function acquireGoogleTokens(): Promise<boolean> {
         return;
       }
 
-      // Listen for the callback page to post the auth code
       const handler = async (e: MessageEvent) => {
         if (e.origin !== window.location.origin) return;
         if (e.data?.type !== "google_auth_code") return;
@@ -96,42 +143,16 @@ export async function acquireGoogleTokens(): Promise<boolean> {
         window.removeEventListener("message", handler);
         clearInterval(pollTimer);
 
-        const { code, state: returnedState } = e.data;
-        const savedState = sessionStorage.getItem("google_oauth_state");
-        sessionStorage.removeItem("google_oauth_state");
-
-        if (returnedState !== savedState) {
-          console.error("[google-auth] State mismatch");
-          resolve(false);
-          return;
-        }
-
-        try {
-          const { error } = await supabase.functions.invoke("google-oauth-exchange", {
-            body: { code, redirect_uri: redirectUri },
-          });
-
-          if (error) {
-            console.error("[google-auth] Token exchange failed:", error);
-            resolve(false);
-          } else {
-            console.log("[google-auth] Google API tokens stored successfully");
-            resolve(true);
-          }
-        } catch (err) {
-          console.error("[google-auth] Token exchange error:", err);
-          resolve(false);
-        }
+        const result = await exchangeGoogleCode(e.data.code, e.data.state);
+        resolve(result);
       };
 
       window.addEventListener("message", handler);
 
-      // Poll for popup closed without completing
       const pollTimer = setInterval(() => {
         if (popup.closed) {
           clearInterval(pollTimer);
           window.removeEventListener("message", handler);
-          console.warn("[google-auth] Popup closed without completing");
           resolve(false);
         }
       }, 500);
