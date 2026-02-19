@@ -23,13 +23,15 @@ const DRIVE_MIME_TYPES = [
 ];
 
 function chunkText(text: string, title: string): string[] {
+  // Strip null bytes that cause PostgreSQL "unsupported Unicode escape sequence" errors
+  const sanitized = text.replace(/\u0000/g, "");
   const chunks: string[] = [];
   const prefix = `Document: ${title}\n\n`;
   let start = 0;
-  while (start < text.length) {
-    const end = Math.min(start + CHUNK_SIZE, text.length);
-    chunks.push(prefix + text.slice(start, end));
-    if (end >= text.length) break;
+  while (start < sanitized.length) {
+    const end = Math.min(start + CHUNK_SIZE, sanitized.length);
+    chunks.push(prefix + sanitized.slice(start, end));
+    if (end >= sanitized.length) break;
     start += CHUNK_SIZE - CHUNK_OVERLAP;
   }
   return chunks.length > 0 ? chunks : [prefix + "(empty document)"];
@@ -43,10 +45,12 @@ function getMimeExport(mimeType: string): { exportMime: string; method: "export"
       return { exportMime: "text/csv", method: "export" };
     case "application/vnd.google-apps.presentation":
       return { exportMime: "text/plain", method: "export" };
-    case "application/pdf":
     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
     case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      return { exportMime: "text/plain", method: "export" };
+    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+      return { exportMime: "text/csv", method: "export" };
+    case "application/pdf":
     case "text/plain":
       return { exportMime: mimeType, method: "download" };
     default:
