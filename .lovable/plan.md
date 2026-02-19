@@ -1,29 +1,28 @@
 
 
-# Fix: Delete OAuth tokens on sign-out
+# Fix: Delete OAuth Tokens on Sign-Out
 
 ## Problem
-When you sign out and sign back in, the old Google API tokens remain in the `oauth_tokens` table. The Dashboard checks this table, finds existing tokens, and skips the consent popup -- even though those tokens may be stale or belong to a previous session.
+When signing out and back in, old Google API tokens remain in the database, so the Dashboard finds them and skips the consent popup.
 
-## Solution
-Delete the user's `oauth_tokens` rows during sign-out, and also clear the local `pm-compass-indexed` flag so document indexing re-runs on the next sign-in.
+## Two changes needed
 
-## Changes
+### 1. Database: Add DELETE policy on `oauth_tokens`
+Currently users cannot delete their own rows from this table (no RLS DELETE policy exists). A migration is needed:
 
-### `src/contexts/AuthContext.tsx` (signOut function, ~line 51-66)
-- Before clearing the session, delete the user's rows from `oauth_tokens` using `supabase.from("oauth_tokens").delete().eq("user_id", user.id)`
-- Also remove `localStorage` items: `pm-compass-indexed` and `pm-compass-recent-searches`
+```sql
+CREATE POLICY "Users can delete their own tokens"
+  ON public.oauth_tokens
+  FOR DELETE
+  USING (auth.uid() = user_id);
+```
 
-### No other files need changes
-The Dashboard auto-popup logic is correct -- it just never fires because old tokens are never cleaned up.
-
-## Technical details
-
-Updated `signOut` function (in `AuthContext.tsx`):
+### 2. Code: Update `src/contexts/AuthContext.tsx`
+Update the `signOut` function to delete the user's `oauth_tokens` rows and clear local flags before clearing the session:
 
 ```typescript
 const signOut = async () => {
-  // Delete user's oauth tokens so next sign-in re-triggers consent
+  // Delete oauth tokens so next sign-in re-triggers consent
   if (user?.id) {
     supabase.from("oauth_tokens").delete().eq("user_id", user.id).then(() => {});
   }
@@ -45,4 +44,7 @@ const signOut = async () => {
   });
 };
 ```
+
+### No other files need changes
+The Dashboard auto-popup logic is already correct -- it just never fires because old tokens are never cleaned up.
 
