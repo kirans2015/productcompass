@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.google-oauth-exchange]
 verify_jwt = false
 
+[functions.get-google-auth-url]
+verify_jwt = false
+
 [functions.index-documents]
 verify_jwt = false
 
