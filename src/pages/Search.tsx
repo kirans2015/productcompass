@@ -71,7 +71,6 @@ const Search = () => {
 
         if (data?.answer) {
           setAiAnswer(data.answer);
-          setShowSummary(true);
         }
 
         if (data?.sources && Array.isArray(data.sources)) {
@@ -148,9 +147,17 @@ const Search = () => {
                 Results for: "{query}"
               </h1>
               {!loading && !error && (
-                <p className="text-sm text-muted-foreground">
-                  Found {results.length} document{results.length !== 1 ? "s" : ""} · Ranked by relevance to your query
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    Found {results.length} document{results.length !== 1 ? "s" : ""} · Ranked by relevance to your query
+                  </p>
+                  {aiAnswer && !showSummary && (
+                    <PMButton variant="secondary" size="sm" onClick={() => setShowSummary(true)} className="gap-1.5">
+                      <Sparkles className="h-3 w-3" />
+                      Show AI Summary
+                    </PMButton>
+                  )}
+                </div>
               )}
             </div>
           </div>
