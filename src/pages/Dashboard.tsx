@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isTomorrow } from "date-fns";
-import { acquireGoogleTokensPopup } from "@/lib/google-auth";
+import { startGoogleTokenRedirect, acquireGoogleTokensPopup } from "@/lib/google-auth";
 
 const RECENT_SEARCHES_KEY = "pm-compass-recent-searches";
 const INDEXED_FLAG_KEY = "pm-compass-indexed";
@@ -88,13 +88,10 @@ const Dashboard = () => {
       if (!hasTokens && !autoPopupTriggered.current) {
         autoPopupTriggered.current = true;
         try {
-          const success = await acquireGoogleTokensPopup();
-          if (success) {
-            setHasGoogleTokens(true);
-            toast.success("Google connected! Syncing your data...");
-          }
+          await startGoogleTokenRedirect();
+          return; // page is navigating away
         } catch (err) {
-          console.error("[Dashboard] Auto Google popup failed:", err);
+          console.error("[Dashboard] Auto Google redirect failed:", err);
         }
       }
     };
