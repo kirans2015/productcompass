@@ -9,44 +9,17 @@ const GOOGLE_SCOPES = [
 ].join(" ");
 
 /**
- * Sign in with Google via Lovable Cloud auth, capturing the provider token
- * from the OAuth broker's postMessage response.
- * 
- * The Lovable Cloud auth bridge only passes through Supabase session tokens,
- * but the OAuth broker may include the Google provider_token in its response.
- * We set up a parallel message listener to capture it.
+ * Step 1: Sign in with Google via Lovable Cloud auth (creates Supabase session).
+ * Step 2: Open a separate Google OAuth consent popup to get an auth code,
+ *         then exchange it server-side for Google API tokens.
  */
 export async function signInWithGoogle(): Promise<{
   success: boolean;
   redirected?: boolean;
   error?: Error;
 }> {
-  // Set up a listener to capture the full OAuth broker response
-  // The broker sends: { type: "authorization_response", response: { access_token, refresh_token, state, ...possibly provider_token } }
-  let capturedProviderToken: string | null = null;
-  let capturedProviderRefreshToken: string | null = null;
-
-  const messageHandler = (e: MessageEvent) => {
-    const data = e.data;
-    if (!data || typeof data !== "object") return;
-    if (data.type !== "authorization_response") return;
-
-    const response = data.response;
-    console.log("[google-auth] OAuth broker response keys:", response ? Object.keys(response) : "null");
-
-    if (response?.provider_token) {
-      capturedProviderToken = response.provider_token;
-      console.log("[google-auth] Captured provider_token from broker");
-    }
-    if (response?.provider_refresh_token) {
-      capturedProviderRefreshToken = response.provider_refresh_token;
-      console.log("[google-auth] Captured provider_refresh_token from broker");
-    }
-  };
-
-  window.addEventListener("message", messageHandler);
-
   try {
+    // Step 1: Lovable Cloud sign-in (Supabase session)
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
       extraParams: {
@@ -64,47 +37,103 @@ export async function signInWithGoogle(): Promise<{
       return { success: false, error: result.error };
     }
 
-    // Sign-in succeeded. Try to store provider tokens if captured.
-    console.log("[google-auth] Sign-in succeeded. Provider token captured:", !!capturedProviderToken);
-
-    // Also try getting provider_token from the session (fallback)
-    if (!capturedProviderToken) {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.provider_token) {
-          capturedProviderToken = session.provider_token;
-          capturedProviderRefreshToken = session.provider_refresh_token || null;
-          console.log("[google-auth] Got provider_token from session fallback");
-        }
-      } catch (e) {
-        console.warn("[google-auth] Session fallback failed:", e);
-      }
-    }
-
-    // Store the provider token if we have one
-    if (capturedProviderToken) {
-      try {
-        const { error } = await supabase.functions.invoke("store-oauth-tokens", {
-          body: {
-            access_token: capturedProviderToken,
-            refresh_token: capturedProviderRefreshToken,
-            expires_at: null,
-          },
-        });
-        if (error) {
-          console.error("[google-auth] Failed to store OAuth tokens:", error);
-        } else {
-          console.log("[google-auth] OAuth tokens stored successfully");
-        }
-      } catch (err) {
-        console.error("[google-auth] Error storing tokens:", err);
-      }
-    } else {
-      console.warn("[google-auth] No provider_token available. Google API features won't work until tokens are provided.");
-    }
+    // Step 2: Get Google API tokens via separate OAuth flow
+    console.log("[google-auth] Session established. Starting Google API token flow...");
+    await acquireGoogleTokens();
 
     return { success: true };
-  } finally {
-    window.removeEventListener("message", messageHandler);
+  } catch (err) {
+    console.error("[google-auth] Error:", err);
+    return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
+}
+
+/**
+ * Opens a Google OAuth consent popup to get an authorization code,
+ * then sends it to the backend to exchange for Google API tokens.
+ * Can be called independently to re-authorize Google API access.
+ */
+export async function acquireGoogleTokens(): Promise<boolean> {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    console.warn("[google-auth] No VITE_GOOGLE_CLIENT_ID configured, skipping token acquisition");
+    return false;
+  }
+
+  const redirectUri = `${window.location.origin}/auth/callback`;
+  const state = crypto.randomUUID();
+
+  // Store state for CSRF validation
+  sessionStorage.setItem("google_oauth_state", state);
+
+  const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authUrl.searchParams.set("client_id", clientId);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("scope", GOOGLE_SCOPES);
+  authUrl.searchParams.set("access_type", "offline");
+  authUrl.searchParams.set("prompt", "consent");
+  authUrl.searchParams.set("state", state);
+
+  return new Promise((resolve) => {
+    const popup = window.open(
+      authUrl.toString(),
+      "google_auth",
+      `width=${600},height=${700},left=${(screen.width - 600) / 2},top=${(screen.height - 700) / 2}`
+    );
+
+    if (!popup) {
+      console.error("[google-auth] Popup blocked");
+      resolve(false);
+      return;
+    }
+
+    // Listen for the callback page to post the auth code
+    const handler = async (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== "google_auth_code") return;
+
+      window.removeEventListener("message", handler);
+      clearInterval(pollTimer);
+
+      const { code, state: returnedState } = e.data;
+      const savedState = sessionStorage.getItem("google_oauth_state");
+      sessionStorage.removeItem("google_oauth_state");
+
+      if (returnedState !== savedState) {
+        console.error("[google-auth] State mismatch");
+        resolve(false);
+        return;
+      }
+
+      try {
+        const { error } = await supabase.functions.invoke("google-oauth-exchange", {
+          body: { code, redirect_uri: redirectUri },
+        });
+
+        if (error) {
+          console.error("[google-auth] Token exchange failed:", error);
+          resolve(false);
+        } else {
+          console.log("[google-auth] Google API tokens stored successfully");
+          resolve(true);
+        }
+      } catch (err) {
+        console.error("[google-auth] Token exchange error:", err);
+        resolve(false);
+      }
+    };
+
+    window.addEventListener("message", handler);
+
+    // Poll for popup closed without completing
+    const pollTimer = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(pollTimer);
+        window.removeEventListener("message", handler);
+        console.warn("[google-auth] Popup closed without completing");
+        resolve(false);
+      }
+    }, 500);
+  });
 }
