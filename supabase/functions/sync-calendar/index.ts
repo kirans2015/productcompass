@@ -39,10 +39,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get Google access token
+    // Get Google access token (with refresh logic)
     const { data: tokenData, error: tokenError } = await supabase
       .from("oauth_tokens")
-      .select("access_token")
+      .select("access_token, refresh_token, expires_at")
       .eq("provider", "google")
       .single();
 
@@ -53,7 +53,42 @@ Deno.serve(async (req) => {
       });
     }
 
-    const googleToken = tokenData.access_token;
+    let googleToken = tokenData.access_token;
+
+    // Check if token is expired (or expires within 60s)
+    const isExpired = tokenData.expires_at &&
+      new Date(tokenData.expires_at).getTime() < Date.now() + 60_000;
+
+    if (isExpired && tokenData.refresh_token) {
+      const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: Deno.env.get("GOOGLE_CLIENT_ID")!,
+          client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!,
+          refresh_token: tokenData.refresh_token,
+          grant_type: "refresh_token",
+        }),
+      });
+
+      if (!refreshRes.ok) {
+        console.error("Token refresh failed:", await refreshRes.text());
+        return new Response(JSON.stringify({ error: "Google token expired and refresh failed. Please re-authenticate." }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const refreshData = await refreshRes.json();
+      googleToken = refreshData.access_token;
+
+      const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+      await serviceClient
+        .from("oauth_tokens")
+        .update({ access_token: googleToken, expires_at: newExpiresAt })
+        .eq("user_id", user.id)
+        .eq("provider", "google");
+    }
 
     // Fetch calendar events for next 7 days
     const now = new Date();
