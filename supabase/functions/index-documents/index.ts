@@ -46,10 +46,8 @@ function getMimeExport(mimeType: string): { exportMime: string; method: "export"
     case "application/vnd.google-apps.presentation":
       return { exportMime: "text/plain", method: "export" };
     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-    case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-      return { exportMime: "text/plain", method: "export" };
     case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-      return { exportMime: "text/csv", method: "export" };
+    case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
     case "application/pdf":
     case "text/plain":
       return { exportMime: mimeType, method: "download" };
@@ -88,6 +86,21 @@ function getDocUrl(fileId: string, mimeType: string): string {
   }
 }
 
+const OFFICE_MIME_TYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+function sanitizeBinaryText(buffer: ArrayBuffer): string | null {
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  // Strip null bytes and control characters, keeping newlines (\n), carriage returns (\r), and tabs (\t)
+  const cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  // If almost no readable text survived, the file is likely all binary
+  if (cleaned.trim().length < 50) return null;
+  return cleaned;
+}
+
 async function fetchFileContent(fileId: string, mimeType: string, accessToken: string): Promise<string | null> {
   try {
     const { exportMime, method } = getMimeExport(mimeType);
@@ -108,10 +121,15 @@ async function fetchFileContent(fileId: string, mimeType: string, accessToken: s
       return null;
     }
 
+    // Office binary files: decode from arrayBuffer and sanitize
+    if (OFFICE_MIME_TYPES.has(mimeType)) {
+      const buffer = await res.arrayBuffer();
+      return sanitizeBinaryText(buffer);
+    }
+
     if (mimeType === "application/pdf") {
-      // Best-effort: just get whatever text we can from the response
-      const text = await res.text();
-      return text.length > 0 ? text : null;
+      const buffer = await res.arrayBuffer();
+      return sanitizeBinaryText(buffer);
     }
 
     return await res.text();
