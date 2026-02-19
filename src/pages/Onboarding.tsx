@@ -4,16 +4,9 @@ import { PMButton } from "@/components/ui/pm-button";
 import { PMSearchBar } from "@/components/ui/pm-search-bar";
 import { Compass, FolderOpen, FileText, Calendar, Check, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { lovable } from "@/integrations/lovable/index";
+import { signInWithGoogle } from "@/lib/google-auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-
-const GOOGLE_SCOPES = [
-  "https://www.googleapis.com/auth/drive.metadata.readonly",
-  "https://www.googleapis.com/auth/drive.readonly",
-  "https://www.googleapis.com/auth/documents.readonly",
-  "https://www.googleapis.com/auth/calendar.readonly",
-].join(" ");
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -72,14 +65,7 @@ const Onboarding = () => {
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-        extraParams: {
-          access_type: "offline",
-          prompt: "consent",
-          scope: GOOGLE_SCOPES,
-        },
-      });
+      const result = await signInWithGoogle();
 
       if (result.redirected) return;
 
@@ -90,8 +76,9 @@ const Onboarding = () => {
         return;
       }
 
-      // Sign-in succeeded — navigate to dashboard
-      navigate("/dashboard", { replace: true });
+      if (result.success) {
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err) {
       toast.error("Sign-in failed. Please try again.");
       console.error("OAuth error:", err);

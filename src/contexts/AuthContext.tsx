@@ -18,44 +18,6 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// Helper to store OAuth tokens — runs outside the auth callback to avoid deadlocks
-const storeProviderTokens = (session: Session | null) => {
-  if (!session) return;
-  
-  // Use setTimeout to avoid blocking the onAuthStateChange callback
-  setTimeout(async () => {
-    try {
-      // Try getting provider token from a fresh session
-      const { data: { session: freshSession } } = await supabase.auth.getSession();
-      const providerToken = freshSession?.provider_token;
-      const providerRefreshToken = freshSession?.provider_refresh_token;
-      
-      console.log("[AuthContext] provider_token present:", !!providerToken);
-
-      if (providerToken) {
-        const { error } = await supabase.functions.invoke("store-oauth-tokens", {
-          body: {
-            access_token: providerToken,
-            refresh_token: providerRefreshToken || null,
-            expires_at: freshSession?.expires_at
-              ? new Date(freshSession.expires_at * 1000).toISOString()
-              : null,
-          },
-        });
-        if (error) {
-          console.error("[AuthContext] Failed to store OAuth tokens:", error);
-        } else {
-          console.log("[AuthContext] OAuth tokens stored successfully");
-        }
-      } else {
-        console.warn("[AuthContext] No provider_token available. Google API features may not work until re-auth.");
-      }
-    } catch (err) {
-      console.error("[AuthContext] Error storing tokens:", err);
-    }
-  }, 0);
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -72,7 +34,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (event === "SIGNED_IN") {
           console.log("[AuthContext] SIGNED_IN event fired");
-          storeProviderTokens(session);
         }
       }
     );
