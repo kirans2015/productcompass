@@ -22,6 +22,11 @@ const Settings = () => {
   const [docCount, setDocCount] = useState<number | null>(null);
   const [hasGoogleTokens, setHasGoogleTokens] = useState(false);
 
+  // Chunking strategy
+  const [chunkPreset, setChunkPreset] = useState("balanced");
+  const [customChunkSize, setCustomChunkSize] = useState(1600);
+  const [customChunkOverlap, setCustomChunkOverlap] = useState(400);
+
   const displayName = getUserDisplayName(user);
   const userEmail = user?.email || "unknown";
 
@@ -49,10 +54,22 @@ const Settings = () => {
     { name: "Google Calendar", status: hasGoogleTokens ? "Connected" : "Not connected" },
   ];
 
+  const getChunkParams = () => {
+    switch (chunkPreset) {
+      case "precise": return { chunk_size: 800, chunk_overlap: 200 };
+      case "balanced": return { chunk_size: 1600, chunk_overlap: 400 };
+      case "context-rich": return { chunk_size: 3200, chunk_overlap: 800 };
+      case "custom": return { chunk_size: customChunkSize, chunk_overlap: customChunkOverlap };
+      default: return {};
+    }
+  };
+
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await supabase.functions.invoke("index-documents", { body: { offset: 0 } });
+      await supabase.functions.invoke("index-documents", {
+        body: { offset: 0, ...getChunkParams() },
+      });
       const { count } = await supabase
         .from("document_chunks")
         .select("id", { count: "exact", head: true });
@@ -161,6 +178,46 @@ const Settings = () => {
                   {docCount !== null ? `${docCount} document chunks indexed` : "Loading..."}
                 </span>
               </div>
+
+              {/* Chunking Strategy */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <label className="text-sm font-medium text-foreground">Chunking Strategy</label>
+                <select
+                  value={chunkPreset}
+                  onChange={(e) => setChunkPreset(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="precise">Precise (800 / 200 overlap)</option>
+                  <option value="balanced">Balanced (1600 / 400 overlap)</option>
+                  <option value="context-rich">Context-rich (3200 / 800 overlap)</option>
+                  <option value="custom">Custom</option>
+                </select>
+                {chunkPreset === "custom" && (
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground">Chunk Size (chars)</label>
+                      <PMInput
+                        type="number"
+                        value={customChunkSize}
+                        onChange={(e) => setCustomChunkSize(Number(e.target.value))}
+                        min={200}
+                        max={10000}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground">Overlap (chars)</label>
+                      <PMInput
+                        type="number"
+                        value={customChunkOverlap}
+                        onChange={(e) => setCustomChunkOverlap(Number(e.target.value))}
+                        min={0}
+                        max={5000}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <PMButton variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
                 Re-index Now
               </PMButton>

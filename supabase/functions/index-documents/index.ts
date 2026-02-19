@@ -22,17 +22,17 @@ const DRIVE_MIME_TYPES = [
   "text/plain",
 ];
 
-function chunkText(text: string, title: string): string[] {
+function chunkText(text: string, title: string, chunkSize = CHUNK_SIZE, chunkOverlap = CHUNK_OVERLAP): string[] {
   // Strip null bytes that cause PostgreSQL "unsupported Unicode escape sequence" errors
   const sanitized = text.replace(/\u0000/g, "");
   const chunks: string[] = [];
   const prefix = `Document: ${title}\n\n`;
   let start = 0;
   while (start < sanitized.length) {
-    const end = Math.min(start + CHUNK_SIZE, sanitized.length);
+    const end = Math.min(start + chunkSize, sanitized.length);
     chunks.push(prefix + sanitized.slice(start, end));
     if (end >= sanitized.length) break;
-    start += CHUNK_SIZE - CHUNK_OVERLAP;
+    start += chunkSize - chunkOverlap;
   }
   return chunks.length > 0 ? chunks : [prefix + "(empty document)"];
 }
@@ -201,13 +201,21 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Parse optional offset
+    // Parse request body
     let offset = 0;
+    let chunkSize = CHUNK_SIZE;
+    let chunkOverlap = CHUNK_OVERLAP;
     try {
       const body = await req.json();
       offset = body.offset || 0;
+      if (body.chunk_size && Number.isFinite(body.chunk_size) && body.chunk_size > 0) {
+        chunkSize = body.chunk_size;
+      }
+      if (body.chunk_overlap && Number.isFinite(body.chunk_overlap) && body.chunk_overlap >= 0) {
+        chunkOverlap = body.chunk_overlap;
+      }
     } catch {
-      // No body or invalid JSON, use default offset
+      // No body or invalid JSON, use defaults
     }
 
     // Get Google access token (with refresh logic)
@@ -312,7 +320,7 @@ Deno.serve(async (req) => {
         const content = await fetchFileContent(file.id, file.mimeType, googleToken);
         if (!content) continue;
 
-        const chunks = chunkText(content, file.name);
+        const chunks = chunkText(content, file.name, chunkSize, chunkOverlap);
         const docType = getDocType(file.mimeType);
         const docUrl = getDocUrl(file.id, file.mimeType);
         const ownerEmail = file.owners?.[0]?.emailAddress || null;
