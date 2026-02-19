@@ -1,50 +1,32 @@
 
-
-# Fix: Delete OAuth Tokens on Sign-Out
+# Fix: Replace Popup With Full-Page Redirect for Google API Tokens
 
 ## Problem
-When signing out and back in, old Google API tokens remain in the database, so the Dashboard finds them and skips the consent popup.
+After signing out and back in, only the first Google authorization (Lovable app) appears. The second one (Google API token consent) never shows because it uses a popup (`acquireGoogleTokensPopup`) which browsers silently block -- especially right after a redirect.
 
-## Two changes needed
+## Solution
+Replace the popup with a full-page redirect using the existing `startGoogleTokenRedirect()` function. This makes the second consent feel like a seamless continuation of sign-in.
 
-### 1. Database: Add DELETE policy on `oauth_tokens`
-Currently users cannot delete their own rows from this table (no RLS DELETE policy exists). A migration is needed:
+## Changes
 
-```sql
-CREATE POLICY "Users can delete their own tokens"
-  ON public.oauth_tokens
-  FOR DELETE
-  USING (auth.uid() = user_id);
-```
-
-### 2. Code: Update `src/contexts/AuthContext.tsx`
-Update the `signOut` function to delete the user's `oauth_tokens` rows and clear local flags before clearing the session:
+### `src/pages/Dashboard.tsx`
+- Change the import from `acquireGoogleTokensPopup` to `startGoogleTokenRedirect`
+- In the auto-trigger `useEffect` (lines 88-98), replace the popup call with a redirect:
 
 ```typescript
-const signOut = async () => {
-  // Delete oauth tokens so next sign-in re-triggers consent
-  if (user?.id) {
-    supabase.from("oauth_tokens").delete().eq("user_id", user.id).then(() => {});
+if (!hasTokens && !autoPopupTriggered.current) {
+  autoPopupTriggered.current = true;
+  try {
+    await startGoogleTokenRedirect();
+    return; // page is navigating away
+  } catch (err) {
+    console.error("[Dashboard] Auto Google redirect failed:", err);
   }
-
-  setUser(null);
-  setSession(null);
-
-  supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-
-  // Clear local flags
-  localStorage.removeItem("pm-compass-indexed");
-  localStorage.removeItem("pm-compass-recent-searches");
-
-  const keys = Object.keys(localStorage);
-  keys.forEach(key => {
-    if (key.startsWith('sb-')) {
-      localStorage.removeItem(key);
-    }
-  });
-};
+}
 ```
 
-### No other files need changes
-The Dashboard auto-popup logic is already correct -- it just never fires because old tokens are never cleaned up.
+- Keep the manual "Connect Google" banner button using `acquireGoogleTokensPopup` as a fallback (for users who return to dashboard later)
+- Update the import line to include both `startGoogleTokenRedirect` and `acquireGoogleTokensPopup`
 
+### No other files need changes
+`startGoogleTokenRedirect()` and `AuthCallback.tsx` already handle the full-page redirect flow and token exchange correctly.
