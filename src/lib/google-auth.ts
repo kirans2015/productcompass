@@ -19,9 +19,6 @@ export async function signInWithGoogle(): Promise<{
   error?: Error;
 }> {
   try {
-    // Mark that we need to acquire Google API tokens after auth completes
-    sessionStorage.setItem("google_tokens_pending", "true");
-
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
       extraParams: {
@@ -36,13 +33,11 @@ export async function signInWithGoogle(): Promise<{
     }
 
     if (result.error) {
-      sessionStorage.removeItem("google_tokens_pending");
       return { success: false, error: result.error };
     }
 
     return { success: true };
   } catch (err) {
-    sessionStorage.removeItem("google_tokens_pending");
     console.error("[google-auth] Error:", err);
     return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
