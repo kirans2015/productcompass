@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isTomorrow } from "date-fns";
+import { acquireGoogleTokens } from "@/lib/google-auth";
 
 const RECENT_SEARCHES_KEY = "pm-compass-recent-searches";
 const INDEXED_FLAG_KEY = "pm-compass-indexed";
@@ -36,6 +37,10 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [greeting, setGreeting] = useState("Good morning");
   const [showTip, setShowTip] = useState(true);
+
+  // Google API token state
+  const [hasGoogleTokens, setHasGoogleTokens] = useState<boolean | null>(null);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
 
   // Indexing state
   const [indexing, setIndexing] = useState(false);
@@ -66,6 +71,36 @@ const Dashboard = () => {
       if (stored) setRecentSearches(JSON.parse(stored));
     } catch {}
   }, []);
+
+  // Check if user has Google API tokens
+  useEffect(() => {
+    if (!user) return;
+    const checkTokens = async () => {
+      const { count } = await supabase
+        .from("oauth_tokens")
+        .select("id", { count: "exact", head: true })
+        .eq("provider", "google");
+      setHasGoogleTokens((count ?? 0) > 0);
+    };
+    checkTokens();
+  }, [user]);
+
+  const handleConnectGoogle = async () => {
+    setConnectingGoogle(true);
+    try {
+      const success = await acquireGoogleTokens();
+      if (success) {
+        setHasGoogleTokens(true);
+        toast.success("Google connected! Syncing your data...");
+      } else {
+        toast.error("Google connection cancelled or failed.");
+      }
+    } catch {
+      toast.error("Failed to connect Google.");
+    } finally {
+      setConnectingGoogle(false);
+    }
+  };
 
   // Keyboard shortcut for search
   useEffect(() => {
@@ -118,7 +153,7 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !hasGoogleTokens) return;
     const alreadyIndexed = localStorage.getItem(INDEXED_FLAG_KEY);
     if (alreadyIndexed) return;
 
@@ -135,11 +170,11 @@ const Dashboard = () => {
       }
     };
     checkAndIndex();
-  }, [user, runIndexing]);
+  }, [user, hasGoogleTokens, runIndexing]);
 
   // Sync calendar meetings
   useEffect(() => {
-    if (!user) return;
+    if (!user || !hasGoogleTokens) return;
     const syncMeetings = async () => {
       setMeetingsLoading(true);
       setMeetingsError(null);
@@ -197,6 +232,30 @@ const Dashboard = () => {
             <h1 className="text-page-title text-foreground mb-2">{greeting}, {displayName}</h1>
             <p className="text-body text-muted-foreground">Here's what's on your radar today</p>
           </div>
+
+          {/* Google Connect Banner */}
+          {hasGoogleTokens === false && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mb-6 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3"
+            >
+              <div className="flex items-center gap-3">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="text-sm text-foreground">
+                  Connect Google to sync your calendar and search documents
+                </span>
+              </div>
+              <PMButton
+                variant="primary"
+                size="sm"
+                onClick={handleConnectGoogle}
+                loading={connectingGoogle}
+              >
+                Connect Google
+              </PMButton>
+            </motion.div>
+          )}
 
           {/* Indexing Status Banner */}
           <AnimatePresence>

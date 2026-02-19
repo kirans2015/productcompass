@@ -37,13 +37,7 @@ export async function signInWithGoogle(): Promise<{
       return { success: false, error: result.error };
     }
 
-    // Step 2: Get Google API tokens via separate OAuth flow
-    console.log("[google-auth] Session established. Starting Google API token flow...");
-    const tokenResult = await acquireGoogleTokens();
-    if (!tokenResult) {
-      console.warn("[google-auth] Google API token acquisition failed or was cancelled");
-    }
-
+    // Google API tokens are acquired lazily when needed (on Dashboard)
     return { success: true };
   } catch (err) {
     console.error("[google-auth] Error:", err);
