@@ -3,16 +3,9 @@ import Navbar from "@/components/layout/Navbar";
 import { PMButton } from "@/components/ui/pm-button";
 import { FileText, Calendar, Lock, Shield, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { lovable } from "@/integrations/lovable/index";
+import { signInWithGoogle } from "@/lib/google-auth";
 import { toast } from "sonner";
 import { useState } from "react";
-
-const GOOGLE_SCOPES = [
-  "https://www.googleapis.com/auth/drive.metadata.readonly",
-  "https://www.googleapis.com/auth/drive.readonly",
-  "https://www.googleapis.com/auth/documents.readonly",
-  "https://www.googleapis.com/auth/calendar.readonly",
-].join(" ");
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -21,36 +14,20 @@ const Landing = () => {
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-        extraParams: {
-          access_type: "offline",
-          prompt: "consent",
-          scope: GOOGLE_SCOPES,
-        },
-      });
-      
-      console.log("[Landing] signInWithOAuth result:", {
-        redirected: result.redirected,
-        hasError: !!result.error,
-        hasTokens: !!result.tokens,
-      });
+      const result = await signInWithGoogle();
 
-      if (result.redirected) {
-        // Page is being redirected, nothing more to do
-        return;
-      }
-      
+      if (result.redirected) return;
+
       if (result.error) {
         toast.error("Sign-in failed. Please try again.");
         console.error("OAuth error:", result.error);
         setSigningIn(false);
         return;
       }
-      
-      // Sign-in succeeded — explicitly navigate to dashboard
-      console.log("[Landing] Sign-in successful, navigating to dashboard");
-      navigate("/dashboard", { replace: true });
+
+      if (result.success) {
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err) {
       toast.error("Sign-in failed. Please try again.");
       console.error("OAuth error:", err);
