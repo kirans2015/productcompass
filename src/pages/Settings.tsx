@@ -20,6 +20,7 @@ const Settings = () => {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [docCount, setDocCount] = useState<number | null>(null);
+  const [fileCount, setFileCount] = useState<number | null>(null);
   const [hasGoogleTokens, setHasGoogleTokens] = useState(false);
 
   // Chunking strategy
@@ -38,6 +39,15 @@ const Settings = () => {
         .from("document_chunks")
         .select("id", { count: "exact", head: true });
       setDocCount(count ?? 0);
+
+      const { data: distinctDocs } = await supabase
+        .from("document_chunks")
+        .select("document_id")
+        .eq("user_id", user.id);
+      if (distinctDocs) {
+        const unique = new Set(distinctDocs.map((d: any) => d.document_id));
+        setFileCount(unique.size);
+      }
 
       const { count: tokenCount } = await supabase
         .from("oauth_tokens")
@@ -67,9 +77,12 @@ const Settings = () => {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await supabase.functions.invoke("index-documents", {
+      const { data: indexData } = await supabase.functions.invoke("index-documents", {
         body: { offset: 0, ...getChunkParams() },
       });
+      if (indexData?.total) {
+        setFileCount(indexData.total);
+      }
       const { count } = await supabase
         .from("document_chunks")
         .select("id", { count: "exact", head: true });
@@ -172,11 +185,21 @@ const Settings = () => {
           <section className="mb-8">
             <h2 className="text-caption text-muted-foreground mb-4">INDEXING STATUS</h2>
             <div className="p-4 bg-card border border-border rounded-md space-y-3">
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-success" />
-                <span className="text-sm text-foreground">
-                  {docCount !== null ? `${docCount} document chunks indexed` : "Loading..."}
-                </span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-success" />
+                  <span className="text-sm text-foreground">
+                    {docCount !== null ? `${docCount} document chunks indexed` : "Loading..."}
+                  </span>
+                </div>
+                {fileCount !== null && fileCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-success" />
+                    <span className="text-sm text-foreground">
+                      {fileCount} document{fileCount !== 1 ? "s" : ""} parsed
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Chunking Strategy */}
@@ -218,7 +241,7 @@ const Settings = () => {
                 )}
               </div>
 
-              <PMButton variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
+              <PMButton variant="primary" size="sm" onClick={handleSync} loading={syncing}>
                 Re-index Now
               </PMButton>
             </div>
