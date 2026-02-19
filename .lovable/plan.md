@@ -1,44 +1,48 @@
 
 
-# Auto-trigger Google Consent Popup on Dashboard Load
+# Fix: Delete OAuth tokens on sign-out
 
-## What changes
-When a user lands on the Dashboard after signing in, the app will automatically check the database for Google API tokens. If none exist, it immediately opens the Google consent popup -- no button click required, no sessionStorage flags.
+## Problem
+When you sign out and sign back in, the old Google API tokens remain in the `oauth_tokens` table. The Dashboard checks this table, finds existing tokens, and skips the consent popup -- even though those tokens may be stale or belong to a previous session.
+
+## Solution
+Delete the user's `oauth_tokens` rows during sign-out, and also clear the local `pm-compass-indexed` flag so document indexing re-runs on the next sign-in.
 
 ## Changes
 
-### 1. `src/pages/Dashboard.tsx` -- Simplify the token-check effect (lines 76-97)
+### `src/contexts/AuthContext.tsx` (signOut function, ~line 51-66)
+- Before clearing the session, delete the user's rows from `oauth_tokens` using `supabase.from("oauth_tokens").delete().eq("user_id", user.id)`
+- Also remove `localStorage` items: `pm-compass-indexed` and `pm-compass-recent-searches`
 
-Replace the current token-check `useEffect` with simpler logic:
-- Query `oauth_tokens` for a row with `provider = "google"`
-- If no tokens found, immediately call `acquireGoogleTokensPopup()`
-- If the popup succeeds, set `hasGoogleTokens(true)` and show a success toast
-- Remove all `sessionStorage` flag checks (`google_tokens_pending`)
-- Add a `useRef` guard to prevent double-triggering from React strict mode
+### No other files need changes
+The Dashboard auto-popup logic is correct -- it just never fires because old tokens are never cleaned up.
 
-### 2. `src/lib/google-auth.ts` -- Clean up `signInWithGoogle` (lines 21-48)
+## Technical details
 
-- Remove the `sessionStorage.setItem("google_tokens_pending", "true")` line and its cleanup in error paths
-- Keep the function focused on just calling `lovable.auth.signInWithOAuth`
+Updated `signOut` function (in `AuthContext.tsx`):
 
-### 3. Keep existing fallback
+```typescript
+const signOut = async () => {
+  // Delete user's oauth tokens so next sign-in re-triggers consent
+  if (user?.id) {
+    supabase.from("oauth_tokens").delete().eq("user_id", user.id).then(() => {});
+  }
 
-The "Connect Google" banner stays as-is for cases where the popup is blocked by the browser.
+  setUser(null);
+  setSession(null);
 
-## Flow after changes
+  supabase.auth.signOut({ scope: 'local' }).catch(() => {});
 
-```text
-User signs in (one popup) --> Lands on /dashboard
-  --> useEffect checks oauth_tokens table
-  --> No tokens found --> auto-opens Google consent popup
-  --> User approves --> tokens stored
-  --> hasGoogleTokens = true --> calendar sync + indexing begin
+  // Clear local flags
+  localStorage.removeItem("pm-compass-indexed");
+  localStorage.removeItem("pm-compass-recent-searches");
+
+  const keys = Object.keys(localStorage);
+  keys.forEach(key => {
+    if (key.startsWith('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+};
 ```
 
-If the popup is blocked, the banner appears and the user can click "Connect Google" manually.
-
-## Technical notes
-- A `useRef` boolean prevents the popup from firing twice (React strict mode runs effects twice in dev)
-- No `sessionStorage` flags are used anywhere in the flow
-- Files modified: `src/pages/Dashboard.tsx`, `src/lib/google-auth.ts`
-- No backend or database changes needed
