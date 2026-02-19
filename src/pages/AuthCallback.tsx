@@ -1,55 +1,35 @@
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { exchangeGoogleCode } from "@/lib/google-auth";
 import { Loader2 } from "lucide-react";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    const code = searchParams.get("code");
-    const state = searchParams.get("state");
-
-    // Case 1: This is a popup receiving a Google auth code — post back to parent
-    if (code && window.opener) {
-      window.opener.postMessage(
-        { type: "google_auth_code", code, state },
-        window.location.origin
-      );
-      setTimeout(() => window.close(), 500);
-      return;
-    }
-
-    // Case 2: Full-page redirect from Google consent (token acquisition)
-    if (code && state && !window.opener) {
-      const handleTokenExchange = async () => {
-        try {
-          const success = await exchangeGoogleCode(code, state);
-          if (success) {
-            console.log("[AuthCallback] Google tokens exchanged, redirecting to dashboard");
-          } else {
-            console.warn("[AuthCallback] Token exchange failed");
-          }
-        } catch (err) {
-          console.error("[AuthCallback] Token exchange error:", err);
-        }
-        navigate("/dashboard", { replace: true });
-      };
-      handleTokenExchange();
-      return;
-    }
-
-    // Case 3: Normal Supabase auth callback
     const handleCallback = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
+        
         if (error || !session) {
           console.error("Auth callback error:", error);
           navigate("/", { replace: true });
           return;
         }
+
+        // Store the Google provider token if available
+        // This is only available immediately after OAuth sign-in
+        if (session.provider_token) {
+          console.log("[AuthCallback] Storing Google provider token");
+          await supabase.functions.invoke("store-oauth-tokens", {
+            body: {
+              access_token: session.provider_token,
+              refresh_token: session.provider_refresh_token || null,
+              expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+            },
+          });
+        }
+
         navigate("/dashboard", { replace: true });
       } catch (err) {
         console.error("Auth callback unexpected error:", err);
@@ -57,12 +37,16 @@ const AuthCallback = () => {
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) {
-        handleCallback();
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          handleCallback();
+        }
       }
-    });
+    );
 
+    // Also try immediately in case the session is already set
     handleCallback();
 
     const timeout = setTimeout(() => navigate("/", { replace: true }), 10000);
@@ -71,7 +55,7 @@ const AuthCallback = () => {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [navigate, searchParams]);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-secondary-bg flex items-center justify-center">

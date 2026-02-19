@@ -16,8 +16,6 @@ const Landing = () => {
     try {
       const result = await signInWithGoogle();
 
-      if (result.redirected) return;
-
       if (result.error) {
         toast.error("Sign-in failed. Please try again.");
         console.error("OAuth error:", result.error);
@@ -25,9 +23,7 @@ const Landing = () => {
         return;
       }
 
-      if (result.success) {
-        navigate("/dashboard", { replace: true });
-      }
+      // Browser redirects to Google — we won't reach here
     } catch (err) {
       toast.error("Sign-in failed. Please try again.");
       console.error("OAuth error:", err);

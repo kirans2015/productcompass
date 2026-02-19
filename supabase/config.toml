@@ -1,12 +1,6 @@
-project_id = "nqdausnuvczxvocslzrj"
+project_id = "ehihqgkkualltuqwmfz"
 
 [functions.store-oauth-tokens]
-verify_jwt = false
-
-[functions.google-oauth-exchange]
-verify_jwt = false
-
-[functions.get-google-auth-url]
 verify_jwt = false
 
 [functions.index-documents]

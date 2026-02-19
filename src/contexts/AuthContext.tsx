@@ -24,21 +24,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up listener FIRST (before getSession) per Supabase docs
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        // Synchronous state updates only — no awaiting inside this callback
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-
-        if (event === "SIGNED_IN") {
-          console.log("[AuthContext] SIGNED_IN event fired");
-        }
       }
     );
 
-    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -49,26 +42,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = async () => {
-    // Delete oauth tokens so next sign-in re-triggers consent
+    // Delete oauth tokens so next sign-in re-triggers Google consent
     if (user?.id) {
       await supabase.from("oauth_tokens").delete().eq("user_id", user.id);
     }
 
+    await supabase.auth.signOut();
+
     setUser(null);
     setSession(null);
-
-    supabase.auth.signOut({ scope: 'local' }).catch(() => {});
 
     // Clear local flags
     localStorage.removeItem("pm-compass-indexed");
     localStorage.removeItem("pm-compass-recent-searches");
-
-    const keys = Object.keys(localStorage);
-    keys.forEach(key => {
-      if (key.startsWith('sb-')) {
-        localStorage.removeItem(key);
-      }
-    });
   };
 
   return (

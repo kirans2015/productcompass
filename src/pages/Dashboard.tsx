@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isTomorrow } from "date-fns";
-import { startGoogleTokenRedirect, acquireGoogleTokensPopup } from "@/lib/google-auth";
 
 const RECENT_SEARCHES_KEY = "pm-compass-recent-searches";
 const INDEXED_FLAG_KEY = "pm-compass-indexed";
@@ -40,7 +39,6 @@ const Dashboard = () => {
 
   // Google API token state
   const [hasGoogleTokens, setHasGoogleTokens] = useState<boolean | null>(null);
-  const [connectingGoogle, setConnectingGoogle] = useState(false);
 
   // Indexing state
   const [indexing, setIndexing] = useState(false);
@@ -72,9 +70,7 @@ const Dashboard = () => {
     } catch {}
   }, []);
 
-  const autoPopupTriggered = useRef(false);
-
-  // Check if user has Google API tokens and auto-trigger consent popup
+  // Check if user has Google API tokens
   useEffect(() => {
     if (!user) return;
     const checkTokens = async () => {
@@ -82,38 +78,10 @@ const Dashboard = () => {
         .from("oauth_tokens")
         .select("id", { count: "exact", head: true })
         .eq("provider", "google");
-      const hasTokens = (count ?? 0) > 0;
-      setHasGoogleTokens(hasTokens);
-
-      if (!hasTokens && !autoPopupTriggered.current) {
-        autoPopupTriggered.current = true;
-        try {
-          await startGoogleTokenRedirect();
-          return; // page is navigating away
-        } catch (err) {
-          console.error("[Dashboard] Auto Google redirect failed:", err);
-        }
-      }
+      setHasGoogleTokens((count ?? 0) > 0);
     };
     checkTokens();
   }, [user]);
-
-  const handleConnectGoogle = async () => {
-    setConnectingGoogle(true);
-    try {
-      const success = await acquireGoogleTokensPopup();
-      if (success) {
-        setHasGoogleTokens(true);
-        toast.success("Google connected! Syncing your data...");
-      } else {
-        toast.error("Google connection cancelled or failed.");
-      }
-    } catch {
-      toast.error("Failed to connect Google.");
-    } finally {
-      setConnectingGoogle(false);
-    }
-  };
 
   // Keyboard shortcut for search
   useEffect(() => {
@@ -138,7 +106,7 @@ const Dashboard = () => {
     }
   }, [showTip]);
 
-  // Document indexing check
+  // Document indexing
   const runIndexing = useCallback(async (offset = 0) => {
     setIndexing(true);
     try {
@@ -170,7 +138,6 @@ const Dashboard = () => {
     const alreadyIndexed = localStorage.getItem(INDEXED_FLAG_KEY);
     if (alreadyIndexed) return;
 
-    // Check if user has any document chunks
     const checkAndIndex = async () => {
       const { count } = await supabase
         .from("document_chunks")
@@ -194,7 +161,6 @@ const Dashboard = () => {
       try {
         const { data, error } = await supabase.functions.invoke("sync-calendar");
         if (error) {
-          // Check for 401 in the error
           if (error.message?.includes("401") || error.message?.includes("expired")) {
             setMeetingsError("expired");
           } else {
@@ -215,10 +181,9 @@ const Dashboard = () => {
       }
     };
     syncMeetings();
-  }, [user]);
+  }, [user, hasGoogleTokens]);
 
   const handleSearch = (query: string) => {
-    // Save to recent searches
     const updated = [query, ...recentSearches.filter((s) => s !== query)].slice(0, 5);
     setRecentSearches(updated);
     localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
@@ -246,7 +211,7 @@ const Dashboard = () => {
             <p className="text-body text-muted-foreground">Here's what's on your radar today</p>
           </div>
 
-          {/* Google Connect Banner - fallback if auto-trigger was missed */}
+          {/* Google Connect Banner — shows if no tokens stored */}
           {hasGoogleTokens === false && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -256,17 +221,9 @@ const Dashboard = () => {
               <div className="flex items-center gap-3">
                 <Calendar className="h-4 w-4 text-primary" />
                 <span className="text-sm text-foreground">
-                  Connect Google to sync your calendar and search documents
+                  Google tokens not detected. Try signing out and signing back in to reconnect.
                 </span>
               </div>
-              <PMButton
-                variant="primary"
-                size="sm"
-                onClick={handleConnectGoogle}
-                loading={connectingGoogle}
-              >
-                Connect Google
-              </PMButton>
             </motion.div>
           )}
 

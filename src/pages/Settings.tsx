@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { PMButton } from "@/components/ui/pm-button";
@@ -8,34 +8,81 @@ import { PMInput } from "@/components/ui/pm-input";
 import { ArrowLeft, Check, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
+function getUserDisplayName(user: any): string {
+  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name;
+  if (fullName) return fullName.split(" ")[0];
+  const email = user?.email;
+  if (email) return email.split("@")[0];
+  return "there";
+}
 
 const Settings = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [docCount, setDocCount] = useState<number | null>(null);
+  const [hasGoogleTokens, setHasGoogleTokens] = useState(false);
+
+  const displayName = getUserDisplayName(user);
+  const userEmail = user?.email || "unknown";
+
+  // Fetch real document count and token status
+  useEffect(() => {
+    if (!user) return;
+    const fetchStats = async () => {
+      const { count } = await supabase
+        .from("document_chunks")
+        .select("id", { count: "exact", head: true });
+      setDocCount(count ?? 0);
+
+      const { count: tokenCount } = await supabase
+        .from("oauth_tokens")
+        .select("id", { count: "exact", head: true })
+        .eq("provider", "google");
+      setHasGoogleTokens((tokenCount ?? 0) > 0);
+    };
+    fetchStats();
+  }, [user]);
 
   const connectedServices = [
-    { name: "Google Drive", status: "Connected", email: "alex@company.com" },
-    { name: "Google Docs", status: "Connected" },
-    { name: "Google Calendar", status: "Connected" },
+    { name: "Google Drive", status: hasGoogleTokens ? "Connected" : "Not connected", email: userEmail },
+    { name: "Google Docs", status: hasGoogleTokens ? "Connected" : "Not connected" },
+    { name: "Google Calendar", status: hasGoogleTokens ? "Connected" : "Not connected" },
   ];
 
-  const handleSync = () => {
+  const handleSync = async () => {
     setSyncing(true);
-    setTimeout(() => {
+    try {
+      await supabase.functions.invoke("index-documents", { body: { offset: 0 } });
+      const { count } = await supabase
+        .from("document_chunks")
+        .select("id", { count: "exact", head: true });
+      setDocCount(count ?? 0);
+      toast.success("Re-indexed successfully!");
+    } catch {
+      toast.error("Failed to re-index.");
+    } finally {
       setSyncing(false);
-      toast.success("Synced!");
-    }, 1500);
+    }
   };
 
-  const handleDisconnect = (service: string) => {
+  const handleDisconnect = async (service: string) => {
+    if (user?.id) {
+      await supabase.from("oauth_tokens").delete().eq("user_id", user.id);
+      setHasGoogleTokens(false);
+    }
     setDisconnectModal(null);
     toast.success(`${service} disconnected`);
   };
 
   const handleClearHistory = () => {
+    localStorage.removeItem("pm-compass-recent-searches");
     toast.success("Search history cleared");
   };
 
@@ -47,14 +94,14 @@ const Settings = () => {
     }
   };
 
-  const handleSignOut = () => {
-    toast.success("Signed out");
+  const handleSignOut = async () => {
+    await signOut();
     navigate("/");
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar isAuthenticated userName="Alex" />
+      <Navbar isAuthenticated userName={displayName} />
 
       <main className="max-w-[600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
@@ -89,17 +136,21 @@ const Settings = () => {
                       <p className="text-small text-muted-foreground">Connected as: {service.email}</p>
                     )}
                     <div className="flex items-center gap-1 mt-1">
-                      <Check className="h-3 w-3 text-success" />
-                      <span className="text-small text-success">{service.status}</span>
+                      <Check className={`h-3 w-3 ${hasGoogleTokens ? "text-success" : "text-muted-foreground"}`} />
+                      <span className={`text-small ${hasGoogleTokens ? "text-success" : "text-muted-foreground"}`}>
+                        {service.status}
+                      </span>
                     </div>
                   </div>
-                  <PMButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setDisconnectModal(service.name)}
-                  >
-                    Disconnect
-                  </PMButton>
+                  {hasGoogleTokens && (
+                    <PMButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setDisconnectModal(service.name)}
+                    >
+                      Disconnect
+                    </PMButton>
+                  )}
                 </div>
               ))}
             </div>
@@ -113,9 +164,10 @@ const Settings = () => {
             <div className="p-4 bg-card border border-border rounded-md space-y-3">
               <div className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-success" />
-                <span className="text-sm text-foreground">156 documents indexed</span>
+                <span className="text-sm text-foreground">
+                  {docCount !== null ? `${docCount} document chunks indexed` : "Loading..."}
+                </span>
               </div>
-              <p className="text-small text-muted-foreground">Last synced: 2 minutes ago</p>
               <PMButton variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
                 Re-index Now
               </PMButton>
@@ -126,14 +178,6 @@ const Settings = () => {
           <section className="mb-8">
             <h2 className="text-caption text-muted-foreground mb-4">USAGE THIS MONTH</h2>
             <div className="p-4 bg-card border border-border rounded-md space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Searches</span>
-                <span className="text-sm text-foreground">32</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Meeting preps</span>
-                <span className="text-sm text-foreground">8</span>
-              </div>
               <PMBadge variant="success">Beta — Unlimited access</PMBadge>
             </div>
           </section>
@@ -146,7 +190,7 @@ const Settings = () => {
             <div className="p-4 bg-card border border-border rounded-md space-y-3">
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Email</span>
-                <span className="text-sm text-foreground">alex@company.com</span>
+                <span className="text-sm text-foreground">{userEmail}</span>
               </div>
             </div>
           </section>
