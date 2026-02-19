@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isTomorrow } from "date-fns";
-import { acquireGoogleTokens } from "@/lib/google-auth";
+import { acquireGoogleTokensPopup, startGoogleTokenRedirect } from "@/lib/google-auth";
 
 const RECENT_SEARCHES_KEY = "pm-compass-recent-searches";
 const INDEXED_FLAG_KEY = "pm-compass-indexed";
@@ -80,7 +80,18 @@ const Dashboard = () => {
         .from("oauth_tokens")
         .select("id", { count: "exact", head: true })
         .eq("provider", "google");
-      setHasGoogleTokens((count ?? 0) > 0);
+      const hasTokens = (count ?? 0) > 0;
+      setHasGoogleTokens(hasTokens);
+
+      // If no tokens and we just signed in, auto-redirect to Google consent
+      if (!hasTokens && sessionStorage.getItem("google_tokens_pending") === "true") {
+        sessionStorage.removeItem("google_tokens_pending");
+        try {
+          await startGoogleTokenRedirect();
+        } catch (err) {
+          console.error("[Dashboard] Auto Google redirect failed:", err);
+        }
+      }
     };
     checkTokens();
   }, [user]);
@@ -88,7 +99,7 @@ const Dashboard = () => {
   const handleConnectGoogle = async () => {
     setConnectingGoogle(true);
     try {
-      const success = await acquireGoogleTokens();
+      const success = await acquireGoogleTokensPopup();
       if (success) {
         setHasGoogleTokens(true);
         toast.success("Google connected! Syncing your data...");

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { exchangeGoogleCode } from "@/lib/google-auth";
 import { Loader2 } from "lucide-react";
 
 const AuthCallback = () => {
@@ -8,33 +9,47 @@ const AuthCallback = () => {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // Check if this is a Google OAuth code callback (from the popup)
     const code = searchParams.get("code");
     const state = searchParams.get("state");
 
+    // Case 1: This is a popup receiving a Google auth code — post back to parent
     if (code && window.opener) {
-      // This is the popup receiving the Google auth code
-      // Post it back to the parent window
       window.opener.postMessage(
         { type: "google_auth_code", code, state },
         window.location.origin
       );
-      // Close this popup after a brief delay
       setTimeout(() => window.close(), 500);
       return;
     }
 
-    // Otherwise, handle normal Supabase auth callback
+    // Case 2: Full-page redirect from Google consent (token acquisition)
+    if (code && state && !window.opener) {
+      const handleTokenExchange = async () => {
+        try {
+          const success = await exchangeGoogleCode(code, state);
+          if (success) {
+            console.log("[AuthCallback] Google tokens exchanged, redirecting to dashboard");
+          } else {
+            console.warn("[AuthCallback] Token exchange failed");
+          }
+        } catch (err) {
+          console.error("[AuthCallback] Token exchange error:", err);
+        }
+        navigate("/dashboard", { replace: true });
+      };
+      handleTokenExchange();
+      return;
+    }
+
+    // Case 3: Normal Supabase auth callback
     const handleCallback = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-
         if (error || !session) {
           console.error("Auth callback error:", error);
           navigate("/", { replace: true });
           return;
         }
-
         navigate("/dashboard", { replace: true });
       } catch (err) {
         console.error("Auth callback unexpected error:", err);
