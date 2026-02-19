@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isTomorrow } from "date-fns";
-import { acquireGoogleTokensPopup, startGoogleTokenRedirect } from "@/lib/google-auth";
+import { acquireGoogleTokensPopup } from "@/lib/google-auth";
 
 const RECENT_SEARCHES_KEY = "pm-compass-recent-searches";
 const INDEXED_FLAG_KEY = "pm-compass-indexed";
@@ -72,7 +72,9 @@ const Dashboard = () => {
     } catch {}
   }, []);
 
-  // Check if user has Google API tokens
+  const autoPopupTriggered = useRef(false);
+
+  // Check if user has Google API tokens and auto-trigger consent popup
   useEffect(() => {
     if (!user) return;
     const checkTokens = async () => {
@@ -83,13 +85,16 @@ const Dashboard = () => {
       const hasTokens = (count ?? 0) > 0;
       setHasGoogleTokens(hasTokens);
 
-      // If no tokens and we just signed in, auto-redirect to Google consent
-      if (!hasTokens && sessionStorage.getItem("google_tokens_pending") === "true") {
-        sessionStorage.removeItem("google_tokens_pending");
+      if (!hasTokens && !autoPopupTriggered.current) {
+        autoPopupTriggered.current = true;
         try {
-          await startGoogleTokenRedirect();
+          const success = await acquireGoogleTokensPopup();
+          if (success) {
+            setHasGoogleTokens(true);
+            toast.success("Google connected! Syncing your data...");
+          }
         } catch (err) {
-          console.error("[Dashboard] Auto Google redirect failed:", err);
+          console.error("[Dashboard] Auto Google popup failed:", err);
         }
       }
     };
