@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20250929",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 500,
         temperature: 0,
         system: "You are a helpful document search assistant for Product Managers. Answer the user's question based ONLY on the provided document chunks. If the information is not in the chunks, say 'I couldn't find this in your documents.' Always cite which document each piece of information comes from. Be concise and direct.",
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
       document_url: m.document_url,
       document_owner: m.document_owner,
       similarity: m.similarity,
-      chunk_preview: m.chunk_text.slice(0, 200),
+      chunk_text: m.chunk_text.slice(0, 200),
     }));
 
     return new Response(JSON.stringify({ answer, sources, query }), {
