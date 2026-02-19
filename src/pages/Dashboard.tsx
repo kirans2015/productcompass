@@ -9,18 +9,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserDisplayName } from "@/lib/utils";
 import { format, isToday, isTomorrow } from "date-fns";
 
 const RECENT_SEARCHES_KEY = "pm-compass-recent-searches";
 const INDEXED_FLAG_KEY = "pm-compass-indexed";
-
-function getUserDisplayName(user: any): string {
-  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name;
-  if (fullName) return fullName.split(" ")[0];
-  const email = user?.email;
-  if (email) return email.split("@")[0];
-  return "there";
-}
 
 function formatMeetingTime(startTime: string): string {
   const date = new Date(startTime);

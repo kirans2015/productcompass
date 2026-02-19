@@ -10,14 +10,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-
-function getUserDisplayName(user: any): string {
-  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name;
-  if (fullName) return fullName.split(" ")[0];
-  const email = user?.email;
-  if (email) return email.split("@")[0];
-  return "there";
-}
+import { getUserDisplayName } from "@/lib/utils";
 
 const Settings = () => {
   const navigate = useNavigate();

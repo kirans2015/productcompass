@@ -1,96 +1,157 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { PMCard, PMCardHeader, PMCardTitle, PMCardContent } from "@/components/ui/pm-card";
 import { PMButton } from "@/components/ui/pm-button";
 import { PMAvatar } from "@/components/ui/pm-avatar";
-import { ArrowLeft, Calendar, Users, Target, FileText, Copy, RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowLeft, Calendar, Users, FileText, Copy, RefreshCw, Loader2, AlertTriangle, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-
-const mockMeetings: Record<string, {
-  title: string;
-  time: string;
-  duration: string;
-  attendees: { name: string; role: string | null }[];
-}> = {
-  "meeting-1": {
-    title: "Daily Standup",
-    time: "9:30 AM",
-    duration: "15 min",
-    attendees: [
-      { name: "You", role: null },
-      { name: "Sarah Chen", role: "Eng Lead" },
-      { name: "Mike Ross", role: "Backend" },
-      { name: "Lisa Wong", role: "Designer" },
-    ],
-  },
-  "meeting-2": {
-    title: "1:1 with Sarah",
-    time: "2:00 PM",
-    duration: "30 min",
-    attendees: [
-      { name: "You", role: null },
-      { name: "Sarah Chen", role: "Eng Lead" },
-    ],
-  },
-  "meeting-3": {
-    title: "Sprint Planning",
-    time: "4:00 PM",
-    duration: "1 hour",
-    attendees: [
-      { name: "You", role: null },
-      { name: "Product Team", role: null },
-      { name: "Engineering Team", role: null },
-    ],
-  },
-};
-
-const mockMeetingPrep = {
-  likelyTopics: [
-    "Q1 roadmap finalization",
-    "Engineering capacity and resource allocation",
-    "Feature prioritization for next sprint",
-    "Timeline review for upcoming releases",
-  ],
-  relevantDocs: [
-    { name: "Q1 Roadmap Draft v2", context: "You edited yesterday" },
-    { name: "Engineering Capacity Plan", context: "Shared by Sarah, Dec 1" },
-    { name: "Feature Priority Matrix", context: "You created Nov 28" },
-  ],
-};
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { getUserDisplayName } from "@/lib/utils";
+import { format } from "date-fns";
 
 const MeetingPrep = () => {
   const navigate = useNavigate();
   const { meetingId } = useParams();
-  const meeting = mockMeetings[meetingId || "meeting-1"] || mockMeetings["meeting-1"];
+  const { user } = useAuth();
+  const displayName = getUserDisplayName(user);
+
+  const [meeting, setMeeting] = useState<any>(null);
+  const [brief, setBrief] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch meeting from database
+  useEffect(() => {
+    if (!meetingId) return;
+
+    const fetchMeeting = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const { data: meetingData, error: meetingError } = await supabase
+          .from("meetings")
+          .select("*")
+          .eq("id", meetingId)
+          .single();
+
+        if (meetingError) throw meetingError;
+
+        setMeeting(meetingData);
+
+        // If meeting already has a brief, use it
+        if (meetingData.brief) {
+          setBrief(meetingData.brief);
+        }
+      } catch (err: any) {
+        console.error("Failed to fetch meeting:", err);
+        setError("Failed to load meeting details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMeeting();
+  }, [meetingId]);
+
+  // Generate brief if meeting loaded but has no brief
+  useEffect(() => {
+    if (!meeting || brief || briefLoading) return;
+    if (meeting.brief) return;
+
+    const generateBrief = async () => {
+      setBriefLoading(true);
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("prepare-meeting", {
+          body: { meeting_id: meetingId },
+        });
+
+        if (fnError) throw fnError;
+
+        if (data?.brief) {
+          setBrief(data.brief);
+        }
+      } catch (err: any) {
+        console.error("Failed to generate brief:", err);
+        toast.error("Failed to generate meeting brief.");
+      } finally {
+        setBriefLoading(false);
+      }
+    };
+
+    generateBrief();
+  }, [meeting, brief, briefLoading, meetingId]);
 
   const handleCopyBrief = () => {
-    const brief = `
+    if (!meeting || !brief) return;
+
+    const attendees = Array.isArray(meeting.attendees)
+      ? meeting.attendees.map((a: any) => typeof a === "string" ? a : a.email || a.name || "").join(", ")
+      : "";
+
+    const text = `
 Meeting: ${meeting.title}
-Time: Today, ${meeting.time} (${meeting.duration})
-Attendees: ${meeting.attendees.map((a) => a.name).join(", ")}
+Time: ${meeting.start_time ? format(new Date(meeting.start_time), "PPp") : "TBD"}
+Attendees: ${attendees}
 
-Likely Topics:
-${mockMeetingPrep.likelyTopics.map((t) => `• ${t}`).join("\n")}
-
-Relevant Documents:
-${mockMeetingPrep.relevantDocs.map((d) => `• ${d.name} - ${d.context}`).join("\n")}
+Brief:
+${brief}
     `.trim();
 
-    navigator.clipboard.writeText(brief);
+    navigator.clipboard.writeText(text);
     toast.success("Brief copied to clipboard!");
   };
 
-  const handleRefresh = () => {
-    toast.info("Refreshing meeting data...");
-    setTimeout(() => {
-      toast.success("Meeting data updated!");
-    }, 1000);
+  const handleRefresh = async () => {
+    if (!meetingId) return;
+    setBriefLoading(true);
+    setBrief(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("prepare-meeting", {
+        body: { meeting_id: meetingId },
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.brief) {
+        setBrief(data.brief);
+        toast.success("Brief refreshed!");
+      }
+    } catch (err: any) {
+      console.error("Failed to refresh brief:", err);
+      toast.error("Failed to refresh meeting brief.");
+    } finally {
+      setBriefLoading(false);
+    }
+  };
+
+  const formatMeetingTime = (startTime: string, endTime?: string) => {
+    const start = new Date(startTime);
+    const timeStr = format(start, "EEEE, MMMM d · h:mm a");
+    if (endTime) {
+      const end = new Date(endTime);
+      const duration = Math.round((end.getTime() - start.getTime()) / 60000);
+      return `${timeStr} (${duration} min)`;
+    }
+    return timeStr;
+  };
+
+  const getAttendees = (): { name: string; role: string | null }[] => {
+    if (!meeting?.attendees || !Array.isArray(meeting.attendees)) return [];
+    return meeting.attendees.map((a: any) => {
+      if (typeof a === "string") return { name: a, role: null };
+      return { name: a.email || a.name || "Unknown", role: null };
+    });
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar isAuthenticated userName="Alex" />
+      <Navbar isAuthenticated userName={displayName} />
 
       <main className="max-w-[800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
@@ -107,106 +168,135 @@ ${mockMeetingPrep.relevantDocs.map((d) => `• ${d.name} - ${d.context}`).join("
             Back to Dashboard
           </button>
 
-          {/* Meeting Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-2 text-primary mb-2">
-              <Calendar className="h-5 w-5" />
+          {/* Loading State */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+              <p className="text-sm text-muted-foreground">Loading meeting details...</p>
             </div>
-            <h1 className="text-page-title text-foreground mb-2">{meeting.title}</h1>
-            <p className="text-muted-foreground">
-              Today, {meeting.time} – {meeting.duration}
-            </p>
-          </div>
+          )}
 
-          {/* Attendees */}
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">Attendees</span>
+          {/* Error State */}
+          {error && !loading && (
+            <div className="flex items-center gap-3 p-4 rounded-md border border-error/20 bg-error/5">
+              <AlertTriangle className="h-5 w-5 text-error shrink-0" />
+              <p className="text-sm text-foreground">{error}</p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {meeting.attendees.map((attendee) => (
-                <div key={attendee.name} className="flex items-center gap-2">
-                  <PMAvatar name={attendee.name} size="sm" />
-                  <div>
-                    <span className="text-sm text-foreground">{attendee.name}</span>
-                    {attendee.role && (
-                      <span className="text-small text-muted-foreground ml-1">({attendee.role})</span>
-                    )}
+          )}
+
+          {/* Meeting Content */}
+          {!loading && !error && meeting && (
+            <>
+              {/* Meeting Header */}
+              <div className="mb-8">
+                <div className="flex items-center gap-2 text-primary mb-2">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <h1 className="text-page-title text-foreground mb-2">{meeting.title}</h1>
+                <p className="text-muted-foreground">
+                  {meeting.start_time ? formatMeetingTime(meeting.start_time, meeting.end_time) : "Time not set"}
+                </p>
+              </div>
+
+              {/* Attendees */}
+              {getAttendees().length > 0 && (
+                <div className="mb-8">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Attendees</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {getAttendees().map((attendee) => (
+                      <div key={attendee.name} className="flex items-center gap-2">
+                        <PMAvatar name={attendee.name} size="sm" />
+                        <div>
+                          <span className="text-sm text-foreground">{attendee.name}</span>
+                          {attendee.role && (
+                            <span className="text-small text-muted-foreground ml-1">({attendee.role})</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
 
-          <hr className="border-border mb-8" />
+              <hr className="border-border mb-8" />
 
-          {/* Likely Topics */}
-          <section className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="h-4 w-4 text-muted-foreground" />
-              <span className="text-caption text-muted-foreground">LIKELY TOPICS</span>
-            </div>
-            <p className="text-small text-muted-foreground mb-3">
-              Based on meeting title and recent activity:
-            </p>
-            <div className="bg-secondary-bg rounded-md p-4">
-              <ul className="space-y-2">
-                {mockMeetingPrep.likelyTopics.map((topic) => (
-                  <li key={topic} className="flex items-start gap-2 text-sm text-foreground">
-                    <span className="text-muted-foreground">•</span>
-                    {topic}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
+              {/* AI Meeting Brief */}
+              <section className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-caption text-muted-foreground">AI MEETING BRIEF</span>
+                </div>
 
-          <hr className="border-border mb-8" />
-
-          {/* Relevant Documents */}
-          <section className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-caption text-muted-foreground">RELEVANT DOCUMENTS</span>
-            </div>
-            <PMCard className="p-0">
-              <PMCardContent className="divide-y divide-border">
-                {mockMeetingPrep.relevantDocs.map((doc) => (
-                  <div
-                    key={doc.name}
-                    className="flex items-center justify-between p-4 hover:bg-secondary-bg transition-colors"
-                  >
-                    <div>
-                      <span className="text-sm font-medium text-foreground">{doc.name}</span>
-                      <p className="text-small text-muted-foreground">{doc.context}</p>
-                    </div>
-                    <PMButton variant="ghost" size="sm" className="gap-1.5">
-                      <ExternalLink className="h-3 w-3" />
-                      Open
-                    </PMButton>
+                {briefLoading && (
+                  <div className="flex items-center gap-3 p-6 bg-secondary-bg rounded-md">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">Generating meeting brief...</span>
                   </div>
-                ))}
-              </PMCardContent>
-            </PMCard>
-            <PMButton variant="secondary" className="mt-3 w-full sm:w-auto">
-              Open All in New Tabs
-            </PMButton>
-          </section>
+                )}
 
-          <hr className="border-border mb-8" />
+                {!briefLoading && brief && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-md p-5">
+                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                      {brief}
+                    </p>
+                  </div>
+                )}
 
-          {/* Footer Actions */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <PMButton variant="primary" onClick={handleCopyBrief} className="gap-2">
-              <Copy className="h-4 w-4" />
-              Copy Brief to Clipboard
-            </PMButton>
-            <PMButton variant="secondary" onClick={handleRefresh} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </PMButton>
-          </div>
+                {!briefLoading && !brief && (
+                  <div className="text-center py-8 bg-secondary-bg rounded-md">
+                    <p className="text-sm text-muted-foreground">
+                      No brief available for this meeting yet.
+                    </p>
+                  </div>
+                )}
+              </section>
+
+              {/* Description if available */}
+              {meeting.description && (
+                <>
+                  <hr className="border-border mb-8" />
+                  <section className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-caption text-muted-foreground">MEETING DESCRIPTION</span>
+                    </div>
+                    <div className="bg-secondary-bg rounded-md p-4">
+                      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                        {meeting.description}
+                      </p>
+                    </div>
+                  </section>
+                </>
+              )}
+
+              <hr className="border-border mb-8" />
+
+              {/* Footer Actions */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <PMButton
+                  variant="primary"
+                  onClick={handleCopyBrief}
+                  className="gap-2"
+                  disabled={!brief}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy Brief to Clipboard
+                </PMButton>
+                <PMButton
+                  variant="secondary"
+                  onClick={handleRefresh}
+                  className="gap-2"
+                  disabled={briefLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${briefLoading ? "animate-spin" : ""}`} />
+                  {briefLoading ? "Generating..." : "Refresh"}
+                </PMButton>
+              </div>
+            </>
+          )}
         </motion.div>
       </main>
     </div>
