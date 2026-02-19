@@ -1,4 +1,4 @@
-project_id = "ehihqgkkualltuqwmfz"
+project_id = "ehihqgkkuualltuqwmfz"
 
 [functions.store-oauth-tokens]
 verify_jwt = false
