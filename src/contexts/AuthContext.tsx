@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     // Delete oauth tokens so next sign-in re-triggers consent
     if (user?.id) {
-      supabase.from("oauth_tokens").delete().eq("user_id", user.id).then(() => {});
+      await supabase.from("oauth_tokens").delete().eq("user_id", user.id);
     }
 
     setUser(null);
