@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 20;
 const CHUNK_SIZE = 1600;
 const CHUNK_OVERLAP = 400;
 const EMBEDDING_BATCH_SIZE = 20;
@@ -264,11 +264,13 @@ Deno.serve(async (req) => {
         .eq("provider", "google");
     }
 
-    // Clean slate: delete all existing chunks for this user before re-indexing
-    await serviceClient
-      .from("document_chunks")
-      .delete()
-      .eq("user_id", user.id);
+    // Clean slate: delete all existing chunks only on first batch
+    if (offset === 0) {
+      await serviceClient
+        .from("document_chunks")
+        .delete()
+        .eq("user_id", user.id);
+    }
 
     // List files from Google Drive
     const mimeQuery = DRIVE_MIME_TYPES.map((m) => `mimeType='${m}'`).join(" or ");
