@@ -16,6 +16,10 @@ const DRIVE_MIME_TYPES = [
   "application/vnd.google-apps.spreadsheet",
   "application/vnd.google-apps.presentation",
   "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
 ];
 
 function chunkText(text: string, title: string): string[] {
@@ -40,7 +44,11 @@ function getMimeExport(mimeType: string): { exportMime: string; method: "export"
     case "application/vnd.google-apps.presentation":
       return { exportMime: "text/plain", method: "export" };
     case "application/pdf":
-      return { exportMime: "application/pdf", method: "download" };
+    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+    case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+    case "text/plain":
+      return { exportMime: mimeType, method: "download" };
     default:
       return { exportMime: "text/plain", method: "export" };
   }
@@ -48,10 +56,17 @@ function getMimeExport(mimeType: string): { exportMime: string; method: "export"
 
 function getDocType(mimeType: string): string {
   switch (mimeType) {
-    case "application/vnd.google-apps.document": return "doc";
-    case "application/vnd.google-apps.spreadsheet": return "sheet";
-    case "application/vnd.google-apps.presentation": return "slide";
+    case "application/vnd.google-apps.document":
+    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      return "doc";
+    case "application/vnd.google-apps.spreadsheet":
+    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+      return "sheet";
+    case "application/vnd.google-apps.presentation":
+    case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      return "slide";
     case "application/pdf": return "pdf";
+    case "text/plain": return "doc";
     default: return "unknown";
   }
 }
@@ -193,7 +208,10 @@ Deno.serve(async (req) => {
     const isExpired = tokenData.expires_at &&
       new Date(tokenData.expires_at).getTime() < Date.now() + 60_000;
 
+    console.log("Token expires_at:", tokenData.expires_at, "isExpired:", isExpired);
+
     if (isExpired && tokenData.refresh_token) {
+      console.log("Refreshing token...");
       const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -250,6 +268,7 @@ Deno.serve(async (req) => {
 
     const listData = await listRes.json();
     const allFiles = listData.files || [];
+    console.log("Drive API status:", listRes.status, "Files found:", allFiles.length);
     const total = allFiles.length;
     const filesToProcess = allFiles.slice(offset, offset + BATCH_SIZE);
     const processed = filesToProcess.length;
